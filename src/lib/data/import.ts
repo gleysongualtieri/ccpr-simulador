@@ -163,7 +163,7 @@ export function importarRouteNow(
     rotas.push({
       codigo,
       sufixoTipo: sufixo,
-      unidadeId: (l[iUnidade] ?? decodificado.unidade || unidadeIdPadrao).trim(),
+      unidadeId: ((l[iUnidade] ?? "") || decodificado.unidade || unidadeIdPadrao).trim(),
       regiao: (l[iRegiao] ?? "").trim() || "—",
       ciclo,
       veiculo,
