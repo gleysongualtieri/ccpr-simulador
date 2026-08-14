@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RankingRouteImport } from './routes/ranking'
 import { Route as RoteirizacaoRouteImport } from './routes/roteirizacao'
+import { Route as RotaCodigoRouteImport } from './routes/rota.$codigo'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +29,44 @@ const RoteirizacaoRoute = RoteirizacaoRouteImport.update({
   path: '/roteirizacao',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RotaCodigoRoute = RotaCodigoRouteImport.update({
+  id: '/rota/$codigo',
+  path: '/rota/$codigo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ranking': typeof RankingRoute
   '/roteirizacao': typeof RoteirizacaoRoute
+  '/rota/$codigo': typeof RotaCodigoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ranking': typeof RankingRoute
   '/roteirizacao': typeof RoteirizacaoRoute
+  '/rota/$codigo': typeof RotaCodigoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ranking': typeof RankingRoute
   '/roteirizacao': typeof RoteirizacaoRoute
+  '/rota/$codigo': typeof RotaCodigoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/ranking' | '/roteirizacao'
+  fullPaths: '/' | '/ranking' | '/roteirizacao' | '/rota/$codigo'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/ranking' | '/roteirizacao'
-  id: '__root__' | '/' | '/ranking' | '/roteirizacao'
+  to: '/' | '/ranking' | '/roteirizacao' | '/rota/$codigo'
+  id: '__root__' | '/' | '/ranking' | '/roteirizacao' | '/rota/$codigo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   RankingRoute: typeof RankingRoute
   RoteirizacaoRoute: typeof RoteirizacaoRoute
+  RotaCodigoRoute: typeof RotaCodigoRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RoteirizacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rota/$codigo': {
+      id: '/rota/$codigo'
+      path: '/rota/$codigo'
+      fullPath: '/rota/$codigo'
+      preLoaderRoute: typeof RotaCodigoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   RankingRoute: RankingRoute,
   RoteirizacaoRoute: RoteirizacaoRoute,
+  RotaCodigoRoute: RotaCodigoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
