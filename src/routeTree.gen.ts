@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RankingRouteImport } from './routes/ranking'
+import { Route as RoteirizacaoRouteImport } from './routes/roteirizacao'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +23,40 @@ const RankingRoute = RankingRouteImport.update({
   path: '/ranking',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RoteirizacaoRoute = RoteirizacaoRouteImport.update({
+  id: '/roteirizacao',
+  path: '/roteirizacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ranking': typeof RankingRoute
+  '/roteirizacao': typeof RoteirizacaoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ranking': typeof RankingRoute
+  '/roteirizacao': typeof RoteirizacaoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ranking': typeof RankingRoute
+  '/roteirizacao': typeof RoteirizacaoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/ranking'
+  fullPaths: '/' | '/ranking' | '/roteirizacao'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/ranking'
-  id: '__root__' | '/' | '/ranking'
+  to: '/' | '/ranking' | '/roteirizacao'
+  id: '__root__' | '/' | '/ranking' | '/roteirizacao'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   RankingRoute: typeof RankingRoute
+  RoteirizacaoRoute: typeof RoteirizacaoRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RankingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/roteirizacao': {
+      id: '/roteirizacao'
+      path: '/roteirizacao'
+      fullPath: '/roteirizacao'
+      preLoaderRoute: typeof RoteirizacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   RankingRoute: RankingRoute,
+  RoteirizacaoRoute: RoteirizacaoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
