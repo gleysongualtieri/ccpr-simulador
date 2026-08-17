@@ -10,20 +10,45 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as EquipamentosRouteImport } from './routes/equipamentos'
+import { Route as ImportacaoRouteImport } from './routes/importacao'
 import { Route as RankingRouteImport } from './routes/ranking'
+import { Route as RegioesRouteImport } from './routes/regioes'
+import { Route as RelatoriosRouteImport } from './routes/relatorios'
 import { Route as RoteirizacaoRouteImport } from './routes/roteirizacao'
 import { Route as SimuladorRouteImport } from './routes/simulador'
 import { Route as RotaCodigoRouteImport } from './routes/rota.$codigo'
 import { Route as SimuladorIndexRouteImport } from './routes/simulador.index'
+import { Route as SimuladorCodigoRouteImport } from './routes/simulador.$codigo'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EquipamentosRoute = EquipamentosRouteImport.update({
+  id: '/equipamentos',
+  path: '/equipamentos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportacaoRoute = ImportacaoRouteImport.update({
+  id: '/importacao',
+  path: '/importacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RankingRoute = RankingRouteImport.update({
   id: '/ranking',
   path: '/ranking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegioesRoute = RegioesRouteImport.update({
+  id: '/regioes',
+  path: '/regioes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RelatoriosRoute = RelatoriosRouteImport.update({
+  id: '/relatorios',
+  path: '/relatorios',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RoteirizacaoRoute = RoteirizacaoRouteImport.update({
@@ -46,55 +71,99 @@ const SimuladorIndexRoute = SimuladorIndexRouteImport.update({
   path: '/',
   getParentRoute: () => SimuladorRoute,
 } as any)
+const SimuladorCodigoRoute = SimuladorCodigoRouteImport.update({
+  id: '/$codigo',
+  path: '/$codigo',
+  getParentRoute: () => SimuladorRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/equipamentos': typeof EquipamentosRoute
+  '/importacao': typeof ImportacaoRoute
   '/ranking': typeof RankingRoute
+  '/regioes': typeof RegioesRoute
+  '/relatorios': typeof RelatoriosRoute
   '/roteirizacao': typeof RoteirizacaoRoute
   '/simulador': typeof SimuladorRouteWithChildren
   '/rota/$codigo': typeof RotaCodigoRoute
+  '/simulador/$codigo': typeof SimuladorCodigoRoute
   '/simulador/': typeof SimuladorIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/equipamentos': typeof EquipamentosRoute
+  '/importacao': typeof ImportacaoRoute
   '/ranking': typeof RankingRoute
+  '/regioes': typeof RegioesRoute
+  '/relatorios': typeof RelatoriosRoute
   '/roteirizacao': typeof RoteirizacaoRoute
   '/rota/$codigo': typeof RotaCodigoRoute
+  '/simulador/$codigo': typeof SimuladorCodigoRoute
   '/simulador': typeof SimuladorIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/equipamentos': typeof EquipamentosRoute
+  '/importacao': typeof ImportacaoRoute
   '/ranking': typeof RankingRoute
+  '/regioes': typeof RegioesRoute
+  '/relatorios': typeof RelatoriosRoute
   '/roteirizacao': typeof RoteirizacaoRoute
   '/simulador': typeof SimuladorRouteWithChildren
   '/rota/$codigo': typeof RotaCodigoRoute
+  '/simulador/$codigo': typeof SimuladorCodigoRoute
   '/simulador/': typeof SimuladorIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/equipamentos'
+    | '/importacao'
     | '/ranking'
+    | '/regioes'
+    | '/relatorios'
     | '/roteirizacao'
     | '/simulador'
     | '/rota/$codigo'
+    | '/simulador/$codigo'
     | '/simulador/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/ranking' | '/roteirizacao' | '/rota/$codigo' | '/simulador'
+  to:
+    | '/'
+    | '/equipamentos'
+    | '/importacao'
+    | '/ranking'
+    | '/regioes'
+    | '/relatorios'
+    | '/roteirizacao'
+    | '/rota/$codigo'
+    | '/simulador/$codigo'
+    | '/simulador'
   id:
     | '__root__'
     | '/'
+    | '/equipamentos'
+    | '/importacao'
     | '/ranking'
+    | '/regioes'
+    | '/relatorios'
     | '/roteirizacao'
     | '/simulador'
     | '/rota/$codigo'
+    | '/simulador/$codigo'
     | '/simulador/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  EquipamentosRoute: typeof EquipamentosRoute
+  ImportacaoRoute: typeof ImportacaoRoute
   RankingRoute: typeof RankingRoute
+  RegioesRoute: typeof RegioesRoute
+  RelatoriosRoute: typeof RelatoriosRoute
   RoteirizacaoRoute: typeof RoteirizacaoRoute
   SimuladorRoute: typeof SimuladorRouteWithChildren
   RotaCodigoRoute: typeof RotaCodigoRoute
@@ -109,11 +178,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/equipamentos': {
+      id: '/equipamentos'
+      path: '/equipamentos'
+      fullPath: '/equipamentos'
+      preLoaderRoute: typeof EquipamentosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/importacao': {
+      id: '/importacao'
+      path: '/importacao'
+      fullPath: '/importacao'
+      preLoaderRoute: typeof ImportacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ranking': {
       id: '/ranking'
       path: '/ranking'
       fullPath: '/ranking'
       preLoaderRoute: typeof RankingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/regioes': {
+      id: '/regioes'
+      path: '/regioes'
+      fullPath: '/regioes'
+      preLoaderRoute: typeof RegioesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/relatorios': {
+      id: '/relatorios'
+      path: '/relatorios'
+      fullPath: '/relatorios'
+      preLoaderRoute: typeof RelatoriosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/roteirizacao': {
@@ -144,14 +241,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SimuladorIndexRouteImport
       parentRoute: typeof SimuladorRoute
     }
+    '/simulador/$codigo': {
+      id: '/simulador/$codigo'
+      path: '/$codigo'
+      fullPath: '/simulador/$codigo'
+      preLoaderRoute: typeof SimuladorCodigoRouteImport
+      parentRoute: typeof SimuladorRoute
+    }
   }
 }
 
 interface SimuladorRouteChildren {
+  SimuladorCodigoRoute: typeof SimuladorCodigoRoute
   SimuladorIndexRoute: typeof SimuladorIndexRoute
 }
 
 const SimuladorRouteChildren: SimuladorRouteChildren = {
+  SimuladorCodigoRoute: SimuladorCodigoRoute,
   SimuladorIndexRoute: SimuladorIndexRoute,
 }
 
@@ -161,7 +267,11 @@ const SimuladorRouteWithChildren = SimuladorRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  EquipamentosRoute: EquipamentosRoute,
+  ImportacaoRoute: ImportacaoRoute,
   RankingRoute: RankingRoute,
+  RegioesRoute: RegioesRoute,
+  RelatoriosRoute: RelatoriosRoute,
   RoteirizacaoRoute: RoteirizacaoRoute,
   SimuladorRoute: SimuladorRouteWithChildren,
   RotaCodigoRoute: RotaCodigoRoute,
