@@ -58,7 +58,7 @@ function Regioes() {
         <Kpi
           rotulo="Pior R$/L regional"
           valor={pior ? reaisLitro(pior.agregado.custoLitro) : "—"}
-          detalhe={pior ? `Região ${pior.regiao}` : undefined}
+          detalhe={pior ? `Região ${pior.regiao}` : ""}
           tom="critico"
         />
       </KpiGrid>

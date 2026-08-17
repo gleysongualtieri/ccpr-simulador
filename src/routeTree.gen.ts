@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RankingRouteImport } from './routes/ranking'
+import { Route as RegioesRouteImport } from './routes/regioes'
 import { Route as RoteirizacaoRouteImport } from './routes/roteirizacao'
 import { Route as SimuladorRouteImport } from './routes/simulador'
 import { Route as RotaCodigoRouteImport } from './routes/rota.$codigo'
@@ -25,6 +26,11 @@ const IndexRoute = IndexRouteImport.update({
 const RankingRoute = RankingRouteImport.update({
   id: '/ranking',
   path: '/ranking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegioesRoute = RegioesRouteImport.update({
+  id: '/regioes',
+  path: '/regioes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RoteirizacaoRoute = RoteirizacaoRouteImport.update({
@@ -56,6 +62,7 @@ const SimuladorCodigoRoute = SimuladorCodigoRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ranking': typeof RankingRoute
+  '/regioes': typeof RegioesRoute
   '/roteirizacao': typeof RoteirizacaoRoute
   '/simulador': typeof SimuladorRouteWithChildren
   '/rota/$codigo': typeof RotaCodigoRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ranking': typeof RankingRoute
+  '/regioes': typeof RegioesRoute
   '/roteirizacao': typeof RoteirizacaoRoute
   '/rota/$codigo': typeof RotaCodigoRoute
   '/simulador/$codigo': typeof SimuladorCodigoRoute
@@ -74,6 +82,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ranking': typeof RankingRoute
+  '/regioes': typeof RegioesRoute
   '/roteirizacao': typeof RoteirizacaoRoute
   '/simulador': typeof SimuladorRouteWithChildren
   '/rota/$codigo': typeof RotaCodigoRoute
@@ -85,6 +94,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/ranking'
+    | '/regioes'
     | '/roteirizacao'
     | '/simulador'
     | '/rota/$codigo'
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/ranking'
+    | '/regioes'
     | '/roteirizacao'
     | '/rota/$codigo'
     | '/simulador/$codigo'
@@ -102,6 +113,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/ranking'
+    | '/regioes'
     | '/roteirizacao'
     | '/simulador'
     | '/rota/$codigo'
@@ -112,6 +124,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   RankingRoute: typeof RankingRoute
+  RegioesRoute: typeof RegioesRoute
   RoteirizacaoRoute: typeof RoteirizacaoRoute
   SimuladorRoute: typeof SimuladorRouteWithChildren
   RotaCodigoRoute: typeof RotaCodigoRoute
@@ -131,6 +144,13 @@ declare module '@tanstack/react-router' {
       path: '/ranking'
       fullPath: '/ranking'
       preLoaderRoute: typeof RankingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/regioes': {
+      id: '/regioes'
+      path: '/regioes'
+      fullPath: '/regioes'
+      preLoaderRoute: typeof RegioesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/roteirizacao': {
@@ -188,6 +208,7 @@ const SimuladorRouteWithChildren = SimuladorRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   RankingRoute: RankingRoute,
+  RegioesRoute: RegioesRoute,
   RoteirizacaoRoute: RoteirizacaoRoute,
   SimuladorRoute: SimuladorRouteWithChildren,
   RotaCodigoRoute: RotaCodigoRoute,
