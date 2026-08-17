@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as EquipamentosRouteImport } from './routes/equipamentos'
+import { Route as ImportacaoRouteImport } from './routes/importacao'
 import { Route as RankingRouteImport } from './routes/ranking'
 import { Route as RegioesRouteImport } from './routes/regioes'
 import { Route as RoteirizacaoRouteImport } from './routes/roteirizacao'
@@ -27,6 +28,11 @@ const IndexRoute = IndexRouteImport.update({
 const EquipamentosRoute = EquipamentosRouteImport.update({
   id: '/equipamentos',
   path: '/equipamentos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ImportacaoRoute = ImportacaoRouteImport.update({
+  id: '/importacao',
+  path: '/importacao',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RankingRoute = RankingRouteImport.update({
@@ -68,6 +74,7 @@ const SimuladorCodigoRoute = SimuladorCodigoRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/equipamentos': typeof EquipamentosRoute
+  '/importacao': typeof ImportacaoRoute
   '/ranking': typeof RankingRoute
   '/regioes': typeof RegioesRoute
   '/roteirizacao': typeof RoteirizacaoRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/equipamentos': typeof EquipamentosRoute
+  '/importacao': typeof ImportacaoRoute
   '/ranking': typeof RankingRoute
   '/regioes': typeof RegioesRoute
   '/roteirizacao': typeof RoteirizacaoRoute
@@ -90,6 +98,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/equipamentos': typeof EquipamentosRoute
+  '/importacao': typeof ImportacaoRoute
   '/ranking': typeof RankingRoute
   '/regioes': typeof RegioesRoute
   '/roteirizacao': typeof RoteirizacaoRoute
@@ -103,6 +112,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/equipamentos'
+    | '/importacao'
     | '/ranking'
     | '/regioes'
     | '/roteirizacao'
@@ -114,6 +124,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/equipamentos'
+    | '/importacao'
     | '/ranking'
     | '/regioes'
     | '/roteirizacao'
@@ -124,6 +135,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/equipamentos'
+    | '/importacao'
     | '/ranking'
     | '/regioes'
     | '/roteirizacao'
@@ -136,6 +148,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   EquipamentosRoute: typeof EquipamentosRoute
+  ImportacaoRoute: typeof ImportacaoRoute
   RankingRoute: typeof RankingRoute
   RegioesRoute: typeof RegioesRoute
   RoteirizacaoRoute: typeof RoteirizacaoRoute
@@ -157,6 +170,13 @@ declare module '@tanstack/react-router' {
       path: '/equipamentos'
       fullPath: '/equipamentos'
       preLoaderRoute: typeof EquipamentosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/importacao': {
+      id: '/importacao'
+      path: '/importacao'
+      fullPath: '/importacao'
+      preLoaderRoute: typeof ImportacaoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ranking': {
@@ -228,6 +248,7 @@ const SimuladorRouteWithChildren = SimuladorRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EquipamentosRoute: EquipamentosRoute,
+  ImportacaoRoute: ImportacaoRoute,
   RankingRoute: RankingRoute,
   RegioesRoute: RegioesRoute,
   RoteirizacaoRoute: RoteirizacaoRoute,
