@@ -55,6 +55,62 @@ export interface PreviaImportacao {
   linhasLidas: number;
 }
 
+const ATIVIDADES_CONHECIDAS = [
+  "coleta",
+  "descarrega",
+  "saida",
+  "regresso",
+  "balanza",
+  "pausa",
+  "transvaso",
+  "desengate",
+  "engate",
+  "espera",
+  "descanso",
+];
+
+interface EventoBruto {
+  atividade: string;
+  atividadeBruta: string;
+  veiculo: string;
+  km: number;
+  volume: number;
+  data: Date | null;
+  hora: string;
+  unidade: string;
+  regiao: string;
+}
+
+/** Interpreta "Dt/Hr coleta" em formatos dd/mm/aaaa hh:mm ou ISO. */
+function parseDataHora(valor: string | undefined): Date | null {
+  if (!valor) return null;
+  const t = valor.trim();
+  const br = /^(\d{2})\/(\d{2})\/(\d{2,4})[ T]?(\d{2})?:?(\d{2})?/.exec(t);
+  if (br) {
+    const ano = Number(br[3]!.length === 2 ? `20${br[3]}` : br[3]);
+    return new Date(ano, Number(br[2]) - 1, Number(br[1]), Number(br[4] ?? 0), Number(br[5] ?? 0));
+  }
+  const d = new Date(t);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function horaDe(d: Date | null): string {
+  if (!d) return "00:00";
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function numeroOuZero(valor: string | undefined): number {
+  const n = numero(valor);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function maisFrequente(valores: string[]): { valor: string; distintos: number } {
+  const contagem = new Map<string, number>();
+  for (const v of valores) if (v) contagem.set(v, (contagem.get(v) ?? 0) + 1);
+  const ordenado = [...contagem.entries()].sort((a, b) => b[1] - a[1]);
+  return { valor: ordenado[0]?.[0] ?? "", distintos: contagem.size };
+}
+
 export function importarRouteNow(
   texto: string,
   arquivo: string,
@@ -75,12 +131,11 @@ export function importarRouteNow(
 
   const cab = linhas[0]!;
   const iRota = indice(cab, "rota", "codigo_rota", "route");
+  const iAtividade = indice(cab, "atividade", "evento", "activity");
   const iVeiculo = indice(cab, "veiculo", "vehicle", "codigo_veiculo");
   const iVolume = indice(cab, "volume", "volume_l", "litros");
-  const iKm = indice(cab, "km", "distancia", "km_total");
-  const iCiclo = indice(cab, "ciclo", "dia", "paridade");
-  const iInicio = indice(cab, "inicio", "inicio_rota", "hora_inicio");
-  const iChegada = indice(cab, "chegada", "chegada_base", "balanza", "pesagem");
+  const iKm = indice(cab, "km etapa", "kmetapa", "km", "distancia", "km_total");
+  const iDataHora = indice(cab, "dt/hr coleta", "dthrcoleta", "data_hora", "datahora", "dt/hr");
   const iUnidade = indice(cab, "unidade", "filial");
   const iRegiao = indice(cab, "regiao", "linha");
 
@@ -100,11 +155,39 @@ export function importarRouteNow(
     mock: false,
   };
 
+  // 1. Agrupar eventos por código de rota
+  const grupos = new Map<string, EventoBruto[]>();
   for (let i = 1; i < linhas.length; i++) {
     const l = linhas[i]!;
-    const codigo = (l[iRota] ?? "").toUpperCase();
+    const codigo = (l[iRota] ?? "").trim().toUpperCase();
     if (!codigo) continue;
+    const atividadeBruta = (l[iAtividade] ?? "").trim();
+    const data = parseDataHora(l[iDataHora]);
+    const evento: EventoBruto = {
+      atividade: normalizar(atividadeBruta),
+      atividadeBruta,
+      veiculo: (l[iVeiculo] ?? "").trim().toUpperCase(),
+      km: numeroOuZero(l[iKm]),
+      volume: numeroOuZero(l[iVolume]),
+      data,
+      hora: horaDe(data),
+      unidade: (l[iUnidade] ?? "").trim(),
+      regiao: (l[iRegiao] ?? "").trim(),
+    };
+    if (atividadeBruta && !ATIVIDADES_CONHECIDAS.includes(evento.atividade)) {
+      problemas.push({
+        severidade: "alerta",
+        entidade: codigo,
+        campo: "atividade",
+        mensagem: `Atividade não reconhecida "${atividadeBruta}" — valores somados mesmo assim.`,
+      });
+    }
+    const lista = grupos.get(codigo) ?? [];
+    lista.push(evento);
+    grupos.set(codigo, lista);
+  }
 
+  for (const [codigo, eventosBrutos] of grupos) {
     const sufixo = extrairSufixo(codigo);
     if (!sufixo) {
       problemas.push({
@@ -116,77 +199,124 @@ export function importarRouteNow(
       continue;
     }
 
-    const veiculo = (l[iVeiculo] ?? "").toUpperCase();
-    const decodificado = decodificarVeiculo(veiculo);
-    const equipamento = decodificado.sigla ? equipamentoPorSigla(decodificado.sigla) : undefined;
-    if (!equipamento) {
-      problemas.push({
-        severidade: "erro",
-        entidade: codigo,
-        campo: "veiculo",
-        mensagem: `Equipamento desconhecido no código de veículo "${veiculo || "—"}".`,
+    // 1. Ordenar por Dt/Hr coleta
+    const eventos = [...eventosBrutos].sort(
+      (a, b) => (a.data?.getTime() ?? 0) - (b.data?.getTime() ?? 0),
+    );
+
+    // 2. Quebrar em execuções a cada "Saída"
+    const execucoes: EventoBruto[][] = [];
+    for (const ev of eventos) {
+      if (ev.atividade === "saida" || execucoes.length === 0) {
+        if (ev.atividade === "saida" || execucoes.length === 0) execucoes.push([]);
+      }
+      execucoes[execucoes.length - 1]!.push(ev);
+    }
+
+    for (const execucao of execucoes) {
+      if (execucao.length === 0) continue;
+
+      // 3. Derivações
+      const saida = execucao.find((e) => e.atividade === "saida");
+      const veiculosDistintos = maisFrequente(execucao.map((e) => e.veiculo));
+      const veiculo = saida?.veiculo || veiculosDistintos.valor;
+      if (veiculosDistintos.distintos > 1) {
+        problemas.push({
+          severidade: "alerta",
+          entidade: codigo,
+          campo: "veiculo",
+          mensagem: "Veículo divergente entre eventos da rota.",
+        });
+      }
+
+      const km = execucao.reduce((s, e) => s + e.km, 0);
+      const volumeL = execucao.reduce((s, e) => s + e.volume, 0);
+
+      const comData = execucao.filter((e) => e.data);
+      const primeiro = comData[0] ?? execucao[0]!;
+      const ultimo = comData[comData.length - 1] ?? execucao[execucao.length - 1]!;
+
+      const eventoInicio = saida ?? primeiro;
+      if (!saida) {
+        problemas.push({
+          severidade: "alerta",
+          entidade: codigo,
+          campo: "inicio",
+          mensagem: "Execução sem evento Saída.",
+        });
+      }
+
+      const indiceInicio = execucao.indexOf(eventoInicio);
+      const balanza = execucao.slice(indiceInicio).find((e) => e.atividade === "balanza");
+      if (!balanza) {
+        problemas.push({
+          severidade: "alerta",
+          entidade: codigo,
+          campo: "chegada",
+          mensagem: "Execução sem evento Balanza — jornada não calculada.",
+        });
+      }
+
+      const inicioRota = eventoInicio.hora;
+      const chegadaBase = (balanza ?? ultimo).hora;
+      const dataExecucao = eventoInicio.data;
+      const ciclo: "par" | "impar" =
+        dataExecucao && dataExecucao.getDate() % 2 === 0 ? "par" : "impar";
+
+      // 4. Compatibilidade uma vez por execução
+      const decodificado = decodificarVeiculo(veiculo);
+      const equipamento = decodificado.sigla ? equipamentoPorSigla(decodificado.sigla) : undefined;
+      if (!equipamento) {
+        problemas.push({
+          severidade: "erro",
+          entidade: codigo,
+          campo: "veiculo",
+          mensagem: `Equipamento desconhecido no código de veículo "${veiculo || "—"}".`,
+        });
+        continue;
+      }
+      if (!isCompativel(sufixo, equipamento.id)) {
+        problemas.push({
+          severidade: "alerta",
+          entidade: codigo,
+          campo: "equipamento",
+          mensagem: `Equipamento ${equipamento.nome} não é compatível com rota de sufixo ${sufixo}.`,
+        });
+      }
+
+      // 5. Validações bloqueantes
+      if (!(volumeL > 0)) {
+        problemas.push({ severidade: "erro", entidade: codigo, campo: "volume", mensagem: "Execução sem volume válido." });
+        continue;
+      }
+      if (!(km > 0)) {
+        problemas.push({ severidade: "erro", entidade: codigo, campo: "km", mensagem: "Execução sem km válido." });
+        continue;
+      }
+
+      rotas.push({
+        codigo,
+        sufixoTipo: sufixo,
+        unidadeId:
+          (execucao.find((e) => e.unidade)?.unidade || decodificado.unidade || unidadeIdPadrao).trim(),
+        regiao: execucao.find((e) => e.regiao)?.regiao || "—",
+        ciclo,
+        veiculo,
+        transportadora: decodificado.transportadora,
+        equipamentoId: equipamento.id,
+        volumeL,
+        km,
+        inicioRota,
+        chegadaBase,
+        dataExecucao: dataExecucao ? dataExecucao.toISOString() : undefined,
+        origem,
       });
-      continue;
     }
-    if (!isCompativel(sufixo, equipamento.id)) {
-      problemas.push({
-        severidade: "alerta",
-        entidade: codigo,
-        campo: "equipamento",
-        mensagem: `Equipamento ${equipamento.nome} não é compatível com rota de sufixo ${sufixo}.`,
-      });
-    }
-
-    const volumeL = numero(l[iVolume]);
-    const kmRota = numero(l[iKm]);
-    if (!Number.isFinite(volumeL) || volumeL <= 0) {
-      problemas.push({ severidade: "erro", entidade: codigo, campo: "volume", mensagem: "Rota sem volume válido." });
-      continue;
-    }
-    if (!Number.isFinite(kmRota) || kmRota <= 0) {
-      problemas.push({ severidade: "erro", entidade: codigo, campo: "km", mensagem: "Rota sem km válido." });
-      continue;
-    }
-
-    const cicloBruto = (l[iCiclo] ?? "").toLowerCase();
-    let ciclo: "par" | "impar" | null = null;
-    if (cicloBruto.startsWith("par")) ciclo = "par";
-    else if (cicloBruto.startsWith("imp") || cicloBruto.startsWith("ímp")) ciclo = "impar";
-    if (!ciclo) {
-      problemas.push({ severidade: "erro", entidade: codigo, campo: "ciclo", mensagem: "Rota sem ciclo par/ímpar identificado." });
-      continue;
-    }
-
-    const inicioRota = l[iInicio] ?? "";
-    const chegadaBase = l[iChegada] ?? "";
-    if (!HORA_RE.test(inicioRota) || !HORA_RE.test(chegadaBase)) {
-      problemas.push({
-        severidade: "alerta",
-        entidade: codigo,
-        campo: "horario",
-        mensagem: "Horário inválido — jornada não poderá ser calculada para esta rota.",
-      });
-    }
-
-    rotas.push({
-      codigo,
-      sufixoTipo: sufixo,
-      unidadeId: ((l[iUnidade] ?? "") || decodificado.unidade || unidadeIdPadrao).trim(),
-      regiao: (l[iRegiao] ?? "").trim() || "—",
-      ciclo,
-      veiculo,
-      transportadora: decodificado.transportadora,
-      equipamentoId: equipamento.id,
-      volumeL,
-      km: kmRota,
-      inicioRota: HORA_RE.test(inicioRota) ? inicioRota : "00:00",
-      chegadaBase: HORA_RE.test(chegadaBase) ? chegadaBase : "00:00",
-      origem,
-    });
   }
 
   return { rotas, produtores: [], problemas, linhasLidas: linhas.length - 1 };
 }
+
 
 export function importarProdutoresRotas(texto: string, arquivo: string): PreviaImportacao {
   const linhas = parseDelimitado(texto);
