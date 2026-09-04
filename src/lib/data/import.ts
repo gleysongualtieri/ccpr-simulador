@@ -22,10 +22,18 @@ export function parseDelimitado(texto: string): string[][] {
   return linhas.map((l) => l.split(delimitador).map((c) => c.trim().replace(/^"|"$/g, "")));
 }
 
+function normalizar(texto: string): string {
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
 function indice(cabecalho: string[], ...nomes: string[]): number {
-  const normal = cabecalho.map((c) => c.toLowerCase().replace(/[^a-z0-9]/g, ""));
+  const normal = cabecalho.map((c) => normalizar(c));
   for (const nome of nomes) {
-    const alvo = nome.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const alvo = normalizar(nome);
     const i = normal.indexOf(alvo);
     if (i >= 0) return i;
   }
