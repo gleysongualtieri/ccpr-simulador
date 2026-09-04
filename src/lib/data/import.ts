@@ -200,7 +200,7 @@ export function importarProdutoresRotas(texto: string, arquivo: string): PreviaI
   const cab = linhas[0]!;
   const iCodigo = indice(cab, "codigo", "codigo_produtor", "produtor");
   const iNome = indice(cab, "nome", "razao_social", "produtor_nome");
-  const iVolume = indice(cab, "volume", "volume_l", "litros");
+  const iVolume = indice(cab, "volume", "volume_l", "litros", "volume/coleta", "volume coleta");
   const iRota = indice(cab, "rota", "codigo_rota");
 
   if (iCodigo < 0 || iRota < 0) {
