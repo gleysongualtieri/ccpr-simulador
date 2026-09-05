@@ -67,6 +67,7 @@ const ATIVIDADES_CONHECIDAS = [
   "engate",
   "espera",
   "descanso",
+  "troca de motorista",
 ];
 
 interface EventoBruto {
@@ -131,7 +132,7 @@ export function importarRouteNow(
 
   const cab = linhas[0]!;
   const iRota = indice(cab, "rota", "codigo_rota", "route");
-  const iAtividade = indice(cab, "atividade", "evento", "activity");
+  const iAtividade = indice(cab, "atividade", "atividde", "evento", "activity");
   const iVeiculo = indice(cab, "veiculo", "vehicle", "codigo_veiculo");
   const iVolume = indice(cab, "volume", "volume_l", "litros");
   const iKm = indice(cab, "km etapa", "kmetapa", "km", "distancia", "km_total");
