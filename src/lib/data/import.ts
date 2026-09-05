@@ -67,7 +67,7 @@ const ATIVIDADES_CONHECIDAS = [
   "engate",
   "espera",
   "descanso",
-  "troca de motorista",
+  "trocadem",
 ];
 
 interface EventoBruto {
@@ -231,7 +231,7 @@ export function importarRouteNow(
       }
 
       const km = execucao.reduce((s, e) => s + e.km, 0);
-      const volumeL = execucao.reduce((s, e) => s + e.volume, 0);
+      const volumeL = execucao.filter((e) => e.atividade === "coleta").reduce((s, e) => s + e.volume, 0);
 
       const comData = execucao.filter((e) => e.data);
       const primeiro = comData[0] ?? execucao[0]!;
