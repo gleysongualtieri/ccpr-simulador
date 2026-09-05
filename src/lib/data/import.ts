@@ -67,6 +67,7 @@ const ATIVIDADES_CONHECIDAS = [
   "engate",
   "espera",
   "descanso",
+  "troca de motorista",
 ];
 
 interface EventoBruto {
@@ -131,7 +132,7 @@ export function importarRouteNow(
 
   const cab = linhas[0]!;
   const iRota = indice(cab, "rota", "codigo_rota", "route");
-  const iAtividade = indice(cab, "atividade", "evento", "activity");
+  const iAtividade = indice(cab, "atividade", "atividde", "evento", "activity");
   const iVeiculo = indice(cab, "veiculo", "vehicle", "codigo_veiculo");
   const iVolume = indice(cab, "volume", "volume_l", "litros");
   const iKm = indice(cab, "km etapa", "kmetapa", "km", "distancia", "km_total");
@@ -265,7 +266,7 @@ export function importarRouteNow(
 
       // 4. Compatibilidade uma vez por execução
       const decodificado = decodificarVeiculo(veiculo);
-      const equipamento = decodificado.sigla ? equipamentoPorSigla(decodificado.sigla) : undefined;
+      let equipamento = decodificado.sigla ? equipamentoPorSigla(decodificado.sigla) : undefined;
       if (!equipamento) {
         problemas.push({
           severidade: "erro",
@@ -275,6 +276,20 @@ export function importarRouteNow(
         });
         continue;
       }
+
+      // Sufixo "R" indica conjunto (caminhão + reboque acoplado). A sigla do veículo
+      // continua solteira, então remapeamos para a versão com reboque antes de validar.
+      const REMAPEAMENTO_REBOQUE: Record<string, string> = {
+        toco: "toco_reboque",
+        truck: "truck_reboque",
+        bitruck: "bitruck_reboque",
+      };
+      if (sufixo === "R" && equipamento.id in REMAPEAMENTO_REBOQUE) {
+        const idReboque = REMAPEAMENTO_REBOQUE[equipamento.id]!;
+        const equipamentoRemapeado = getEquipamento(idReboque);
+        if (equipamentoRemapeado) equipamento = equipamentoRemapeado;
+      }
+
       if (!isCompativel(sufixo, equipamento.id)) {
         problemas.push({
           severidade: "alerta",

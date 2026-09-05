@@ -60,7 +60,7 @@ export interface RotaOperacional {
   /** HH:MM — chegada na base (pesagem/Balanza, antes da descarga) */
   chegadaBase: string;
   /** ISO — data/hora do evento de início da execução, quando disponível */
-  dataExecucao?: string;
+  dataExecucao?: string | undefined;
   /** Trechos por motorista, quando houver troca de motorista registrada */
   trechos?: TrechoJornada[];
   /** Rastreabilidade */
