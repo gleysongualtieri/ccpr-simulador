@@ -285,7 +285,7 @@ export function importarRouteNow(
         bitruck: "bitruck_reboque",
       };
       if (sufixo === "R" && equipamento.id in REMAPEAMENTO_REBOQUE) {
-        const idReboque = REMAPEAMENTO_REBOQUE[equipamento.id];
+        const idReboque = REMAPEAMENTO_REBOQUE[equipamento.id]!;
         const equipamentoRemapeado = getEquipamento(idReboque);
         if (equipamentoRemapeado) equipamento = equipamentoRemapeado;
       }
