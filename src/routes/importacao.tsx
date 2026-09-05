@@ -45,6 +45,17 @@ function Importacao() {
   const [mensagem, setMensagem] = useState("");
   const [carregando, setCarregando] = useState(false);
 
+  async function lerArquivoComEncodingCorreto(file: File): Promise<string> {
+    const buffer = await file.arrayBuffer();
+    const textoUtf8 = new TextDecoder("utf-8").decode(buffer);
+    // Se a decodificação UTF-8 gerou caracteres de substituição (�),
+    // o arquivo não é UTF-8 de verdade — refaz como Windows-1252.
+    if (textoUtf8.includes("\uFFFD")) {
+      return new TextDecoder("windows-1252").decode(buffer);
+    }
+    return textoUtf8;
+  }
+
   async function processar(files: FileList | null) {
     if (!files || files.length === 0) return;
     setCarregando(true);
@@ -56,7 +67,7 @@ function Importacao() {
       const arquivos: string[] = [];
 
       for (const file of Array.from(files)) {
-        const texto = await file.text();
+        const texto = await lerArquivoComEncodingCorreto(file);
         arquivos.push(file.name);
         const nome = file.name.toLowerCase();
         const ehProdutores = nome.includes("produtor");
