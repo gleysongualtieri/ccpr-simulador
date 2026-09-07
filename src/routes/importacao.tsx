@@ -6,6 +6,7 @@ import { useDados } from "@/lib/data/store";
 import {
   aplicarRegiaoDosProdutores,
   auditarBase,
+  decodeTextoDoArquivo,
   importarProdutoresRotas,
   importarRouteNow,
 } from "@/lib/data/import";
