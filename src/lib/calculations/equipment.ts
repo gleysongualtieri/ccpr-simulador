@@ -100,24 +100,66 @@ export function equipamentoPorSigla(sigla: string): Equipamento | undefined {
 }
 
 /**
- * Decodifica o código bruto do veículo do Axiodis.
- * Ex.: "0081VIA18BT10" -> unidade 0081, transportadora VIA,
- * capacidade nominal 18 (18.000 L), sigla de equipamento BT.
+ * Variações de sigla encontradas nas exportações do Axiodis, normalizadas
+ * para a sigla canônica da tabela de equipamentos.
  */
-export function decodificarVeiculo(codigo: string): {
+const SIGLAS_ALTERNATIVAS: Record<string, string> = {
+  TC: "TO",
+  TK: "TR",
+  BK: "BT",
+  CR: "CA",
+  VD: "VA",
+  BR: "BI",
+  RT: "BI",
+};
+
+export interface VeiculoDecodificado {
   unidade: string;
   transportadora: string;
   capacidadeNominalL: number | null;
+  /** Capacidade do reboque acoplado (notação "/R15" → 15.000 L). */
+  capacidadeReboqueL: number | null;
+  /** Cavalo + reboque, quando houver reboque. */
+  capacidadeTotalL: number | null;
+  comReboque: boolean;
   sigla: string | null;
-} {
-  const match = /^(\d{4})([A-Z]{2,4})(\d{2})([A-Z]{2})/.exec(codigo.trim().toUpperCase());
-  if (!match) {
-    return { unidade: "", transportadora: "", capacidadeNominalL: null, sigla: null };
-  }
+}
+
+const VAZIO: VeiculoDecodificado = {
+  unidade: "",
+  transportadora: "",
+  capacidadeNominalL: null,
+  capacidadeReboqueL: null,
+  capacidadeTotalL: null,
+  comReboque: false,
+  sigla: null,
+};
+
+/**
+ * Decodifica o código bruto do veículo do Axiodis.
+ * Ex.: "0081VIA18BT10" -> unidade 0081, transportadora VIA,
+ * capacidade nominal 18 (18.000 L), sigla de equipamento BT.
+ * Aceita ainda o sufixo de reboque "/R15" e siglas alternativas (TC, TK, BK...).
+ */
+export function decodificarVeiculo(codigo: string | null | undefined): VeiculoDecodificado {
+  const texto = (codigo ?? "").trim().toUpperCase().replace(/\s+/g, "");
+  if (!texto) return { ...VAZIO };
+
+  const match = /^(\d{4})([A-Z]{2,4})(\d{1,3})([A-Z]{2,3})(\d*)(?:\/R(\d{1,3}))?$/.exec(texto);
+  if (!match) return { ...VAZIO };
+
+  const capacidadeNominalL = match[3] ? Number(match[3]) * 1000 : null;
+  const capacidadeReboqueL = match[6] ? Number(match[6]) * 1000 : null;
+  const siglaBruta = match[4]!;
+  const sigla = SIGLAS_ALTERNATIVAS[siglaBruta] ?? siglaBruta;
+
   return {
     unidade: match[1]!,
     transportadora: match[2]!,
-    capacidadeNominalL: Number(match[3]) * 1000,
-    sigla: match[4]!,
+    capacidadeNominalL,
+    capacidadeReboqueL,
+    capacidadeTotalL: (capacidadeNominalL ?? 0) + (capacidadeReboqueL ?? 0) || null,
+    comReboque: capacidadeReboqueL != null,
+    sigla,
   };
 }
