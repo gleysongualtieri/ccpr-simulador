@@ -15,11 +15,68 @@ import { extrairSufixo, isCompativel } from "@/lib/calculations/compatibility";
 
 export type TipoArquivo = "route_now" | "produtores_rotas";
 
+/** Decodifica o buffer de um arquivo CSV/TXT, assumindo UTF-8 e caindo
+ *  para ISO-8859-1 quando houver caracteres de substituição (arquivos
+ *  do Axiodis geralmente vêm em Windows-1252/ISO-8859-1). */
+export function decodeTextoDoArquivo(buffer: ArrayBuffer): string {
+  const utf8 = new TextDecoder("utf-8").decode(buffer);
+  if (utf8.includes("\uFFFD")) {
+    return new TextDecoder("iso-8859-1").decode(buffer);
+  }
+  return utf8;
+}
+
+/** Remove BOM e quebras de linha DOS. */
+function limparTexto(texto: string): string {
+  return texto.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+/** Escolhe o delimitador mais provável olhando as primeiras linhas. */
+function detectarDelimitador(texto: string): string {
+  const amostra = texto.split("\n").slice(0, 5).join("\n");
+  const contadores = [
+    { d: ";", n: (amostra.match(/;/g) ?? []).length },
+    { d: ",", n: (amostra.match(/,/g) ?? []).length },
+    { d: "\t", n: (amostra.match(/\t/g) ?? []).length },
+    { d: "|", n: (amostra.match(/\|/g) ?? []).length },
+  ];
+  contadores.sort((a, b) => b.n - a.n);
+  return contadores[0]!.n > 0 ? contadores[0]!.d : ";";
+}
+
+/** Parser CSV simples e tolerante: respeita campos entre aspas e
+ *  remove aspas externas. Não explode quando o delimitador aparece
+ *  dentro de um campo entre aspas. */
+function parseLinhaCsv(linha: string, delimitador: string): string[] {
+  const campos: string[] = [];
+  let atual = "";
+  let dentroAspas = false;
+  for (let i = 0; i < linha.length; i++) {
+    const ch = linha[i]!;
+    if (ch === '"') {
+      if (dentroAspas && linha[i + 1] === '"') {
+        atual += '"';
+        i++;
+      } else {
+        dentroAspas = !dentroAspas;
+      }
+    } else if (ch === delimitador && !dentroAspas) {
+      campos.push(atual.trim());
+      atual = "";
+    } else {
+      atual += ch;
+    }
+  }
+  campos.push(atual.trim());
+  return campos.map((c) => c.replace(/^"|"$/g, ""));
+}
+
 export function parseDelimitado(texto: string): string[][] {
-  const linhas = texto.replace(/\r/g, "").split("\n").filter((l) => l.trim().length > 0);
+  const limpo = limparTexto(texto);
+  const linhas = limpo.split("\n").filter((l) => l.trim().length > 0);
   if (linhas.length === 0) return [];
-  const delimitador = (linhas[0]!.match(/;/g)?.length ?? 0) >= (linhas[0]!.match(/,/g)?.length ?? 0) ? ";" : ",";
-  return linhas.map((l) => l.split(delimitador).map((c) => c.trim().replace(/^"|"$/g, "")));
+  const delimitador = detectarDelimitador(limpo);
+  return linhas.map((l) => parseLinhaCsv(l, delimitador));
 }
 
 function normalizar(texto: string): string {
