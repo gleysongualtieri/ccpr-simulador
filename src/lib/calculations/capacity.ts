@@ -12,8 +12,10 @@ export interface ResultadoCapacidade {
 export function validarCapacidade(
   equipamento: Equipamento,
   volumeL: number,
+  capacidadeOverrideL?: number,
 ): ResultadoCapacidade {
-  const capacidadeL = equipamento.capacidadeL;
+  const capacidadeL =
+    capacidadeOverrideL && capacidadeOverrideL > 0 ? capacidadeOverrideL : equipamento.capacidadeL;
   const excedenteL = Math.max(0, volumeL - capacidadeL);
   return {
     capacidadeL,
