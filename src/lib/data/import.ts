@@ -127,6 +127,11 @@ const ATIVIDADES_CONHECIDAS = [
   "trocadem",
 ];
 
+/** Aliases de atividade encontrados nas exportações (Serviço = Balanza). */
+const MAPEAMENTO_ATIVIDADES: Record<string, string> = {
+  servico: "balanza",
+};
+
 interface EventoBruto {
   atividade: string;
   atividadeBruta: string;
