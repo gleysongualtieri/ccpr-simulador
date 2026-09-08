@@ -7,7 +7,17 @@ import { EQUIPAMENTOS } from "./equipment";
  */
 const REGRA: Record<SufixoRota, string[]> = {
   D: ["toco", "truck", "bitruck"],
-  R: ["toco_reboque", "truck_reboque", "bitruck_reboque"],
+  R: [
+    "toco",
+    "truck",
+    "bitruck",
+    "toco_reboque",
+    "truck_reboque",
+    "bitruck_reboque",
+    "carreta",
+    "bitrem",
+    "vanderleia",
+  ],
   A: ["toco", "truck", "bitruck"],
   B: ["toco", "truck", "bitruck"],
   C: ["toco", "truck", "bitruck"],
