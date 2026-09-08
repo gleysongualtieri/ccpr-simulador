@@ -127,6 +127,11 @@ const ATIVIDADES_CONHECIDAS = [
   "trocadem",
 ];
 
+/** Aliases de atividade encontrados nas exportações (Serviço = Balanza). */
+const MAPEAMENTO_ATIVIDADES: Record<string, string> = {
+  servico: "balanza",
+};
+
 interface EventoBruto {
   atividade: string;
   atividadeBruta: string;
@@ -220,9 +225,10 @@ export function importarRouteNow(
     const codigo = (l[iRota] ?? "").trim().toUpperCase();
     if (!codigo) continue;
     const atividadeBruta = (l[iAtividade] ?? "").trim();
+    const atividade = MAPEAMENTO_ATIVIDADES[normalizar(atividadeBruta)] ?? normalizar(atividadeBruta);
     const data = parseDataHora(l[iDataHora]);
     const evento: EventoBruto = {
-      atividade: normalizar(atividadeBruta),
+      atividade,
       atividadeBruta,
       veiculo: (l[iVeiculo] ?? "").trim().toUpperCase(),
       km: numeroOuZero(l[iKm]),
@@ -306,17 +312,28 @@ export function importarRouteNow(
 
       const indiceInicio = execucao.indexOf(eventoInicio);
       const balanza = execucao.slice(indiceInicio).find((e) => e.atividade === "balanza");
-      if (!balanza) {
-        problemas.push({
-          severidade: "alerta",
-          entidade: codigo,
-          campo: "chegada",
-          mensagem: "Execução sem evento Balanza — jornada não calculada.",
-        });
+
+      // Fallback: sem Balanza, usar o último evento de Descarrega
+      let eventoChegada: EventoBruto;
+      if (balanza) {
+        eventoChegada = balanza;
+      } else {
+        const descarregas = execucao.filter((e) => e.atividade === "descarrega");
+        if (descarregas.length > 0) {
+          eventoChegada = descarregas[descarregas.length - 1]!;
+        } else {
+          problemas.push({
+            severidade: "alerta",
+            entidade: codigo,
+            campo: "chegada",
+            mensagem: "Execução sem evento Balanza nem Descarrega — jornada não calculada.",
+          });
+          eventoChegada = ultimo;
+        }
       }
 
       const inicioRota = eventoInicio.hora;
-      const chegadaBase = (balanza ?? ultimo).hora;
+      const chegadaBase = eventoChegada.hora;
       const dataExecucao = eventoInicio.data;
       const ciclo: "par" | "impar" =
         dataExecucao && dataExecucao.getDate() % 2 === 0 ? "par" : "impar";
