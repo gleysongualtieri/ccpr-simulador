@@ -31,15 +31,19 @@ export function indicadoresRota(
   equipamento: Equipamento,
   volumeL: number,
   km: number,
+  /** Capacidade real do veículo (cavalo + reboque), quando conhecida */
+  capacidadeOverrideL?: number,
 ): IndicadoresRota {
   const custo = custoRota(equipamento, km);
+  const capacidadeL =
+    capacidadeOverrideL && capacidadeOverrideL > 0 ? capacidadeOverrideL : equipamento.capacidadeL;
   return {
     volumeL,
     km,
     custo,
     custoLitro: custoPorLitro(custo, volumeL),
     densidade: densidade(volumeL, km),
-    ocupacao: equipamento.capacidadeL > 0 ? volumeL / equipamento.capacidadeL : 0,
-    capacidadeL: equipamento.capacidadeL,
+    ocupacao: capacidadeL > 0 ? volumeL / capacidadeL : 0,
+    capacidadeL,
   };
 }

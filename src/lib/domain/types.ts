@@ -65,6 +65,10 @@ export interface RotaOperacional {
   trechos?: TrechoJornada[];
   /** Rastreabilidade */
   origem: OrigemDado;
+  /** Capacidade real do veículo (cavalo + reboque, quando houver) */
+  capacidadeRealL?: number;
+  /** Capacidade nominal do cavalo (sem reboque) */
+  capacidadeNominalL?: number;
 }
 
 export interface OrigemDado {

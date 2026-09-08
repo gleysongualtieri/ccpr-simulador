@@ -35,7 +35,7 @@ export function simularRota(
   const equipamentoSimulado = getEquipamento(entrada.equipamentoIdSimulado);
   if (!equipamentoAtual || !equipamentoSimulado) return null;
 
-  const atual = indicadoresRota(equipamentoAtual, rota.volumeL, rota.km);
+  const atual = indicadoresRota(equipamentoAtual, rota.volumeL, rota.km, rota.capacidadeRealL);
 
   const novoVolume = rota.volumeL + entrada.aumentoVolumeL;
   const novoKm = rota.km + entrada.aumentoKm;
