@@ -39,7 +39,10 @@ export function simularRota(
 
   const novoVolume = rota.volumeL + entrada.aumentoVolumeL;
   const novoKm = rota.km + entrada.aumentoKm;
-  const simulado = indicadoresRota(equipamentoSimulado, novoVolume, novoKm);
+  // Mantendo o mesmo equipamento, a capacidade real do veículo (cavalo + reboque) continua valendo.
+  const capacidadeSimuladaL =
+    equipamentoSimulado.id === rota.equipamentoId ? rota.capacidadeRealL : undefined;
+  const simulado = indicadoresRota(equipamentoSimulado, novoVolume, novoKm, capacidadeSimuladaL);
 
   return {
     rota,
@@ -48,7 +51,7 @@ export function simularRota(
     atual,
     simulado,
     comparacao: compararIndicadores(atual, simulado),
-    capacidade: validarCapacidade(equipamentoSimulado, novoVolume),
+    capacidade: validarCapacidade(equipamentoSimulado, novoVolume, capacidadeSimuladaL),
     compativel: isCompativel(rota.sufixoTipo, equipamentoSimulado.id),
   };
 }
