@@ -399,6 +399,8 @@ export function importarRouteNow(
         chegadaBase,
         dataExecucao: dataExecucao ? dataExecucao.toISOString() : undefined,
         origem,
+        capacidadeRealL: decodificado.capacidadeTotalL ?? equipamento.capacidadeL,
+        capacidadeNominalL: decodificado.capacidadeNominalL ?? equipamento.capacidadeL,
       });
     }
   }
@@ -501,7 +503,8 @@ export function auditarBase(rotas: RotaOperacional[], produtores: Produtor[]): P
     if (!HORA_RE.test(rota.inicioRota) || !HORA_RE.test(rota.chegadaBase)) {
       problemas.push({ severidade: "alerta", entidade: rota.codigo, campo: "horario", mensagem: "Horário inválido — jornada não calculada." });
     }
-    if (rota.volumeL > equipamento.capacidadeL) {
+    const capacidadeRealL = rota.capacidadeRealL ?? equipamento.capacidadeL;
+    if (rota.volumeL > capacidadeRealL) {
       problemas.push({ severidade: "alerta", entidade: rota.codigo, campo: "capacidade", mensagem: "Volume real acima da capacidade do equipamento." });
     }
     if (!produtores.some((p) => p.rotaCodigo === rota.codigo)) {

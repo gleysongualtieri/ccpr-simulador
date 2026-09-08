@@ -32,7 +32,7 @@ export function montarLinhas(rotas: RotaOperacional[]): LinhaRota[] {
       {
         rota,
         equipamento,
-        ind: indicadoresRota(equipamento, rota.volumeL, rota.km),
+        ind: indicadoresRota(equipamento, rota.volumeL, rota.km, rota.capacidadeRealL),
         jornada: calcularJornada(rota),
         compativel: isCompativel(rota.sufixoTipo, equipamento.id),
       },
