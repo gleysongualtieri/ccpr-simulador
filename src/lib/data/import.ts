@@ -220,9 +220,10 @@ export function importarRouteNow(
     const codigo = (l[iRota] ?? "").trim().toUpperCase();
     if (!codigo) continue;
     const atividadeBruta = (l[iAtividade] ?? "").trim();
+    const atividade = MAPEAMENTO_ATIVIDADES[normalizar(atividadeBruta)] ?? normalizar(atividadeBruta);
     const data = parseDataHora(l[iDataHora]);
     const evento: EventoBruto = {
-      atividade: normalizar(atividadeBruta),
+      atividade,
       atividadeBruta,
       veiculo: (l[iVeiculo] ?? "").trim().toUpperCase(),
       km: numeroOuZero(l[iKm]),
