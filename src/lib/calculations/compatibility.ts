@@ -27,7 +27,7 @@ const REGRA: Record<SufixoRota, string[]> = {
 
 export const DESCRICAO_SUFIXO: Record<SufixoRota, string> = {
   D: "Rota direta — equipamento solteiro",
-  R: "Rota com reboque acoplado",
+  R: "Rota com reboque disponível — aceita equipamento solteiro, com reboque ou T2",
   A: "Rota de apoio — equipamento solteiro",
   B: "Rota de apoio — equipamento solteiro",
   C: "Rota de apoio — equipamento solteiro",
