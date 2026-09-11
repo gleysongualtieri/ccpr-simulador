@@ -4,6 +4,7 @@ import { Tag } from "@/components/ui-ccpr/Kpi";
 import { useLinhasRota } from "@/lib/data/selectors";
 import { useDados } from "@/lib/data/store";
 import { litros, reaisLitro } from "@/lib/format";
+import { chaveRota, identificadorRotaUrl } from "@/lib/data/identity";
 
 export const Route = createFileRoute("/simulador/")({
   head: () => ({
@@ -52,8 +53,9 @@ function SimuladorIndex() {
           >
             <option value="">Selecione uma rota…</option>
             {ordenadas.map((l) => (
-              <option key={l.rota.codigo} value={l.rota.codigo}>
-                {l.rota.codigo} — região {l.rota.regiao} — {reaisLitro(l.ind.custoLitro)}
+              <option key={chaveRota(l.rota)} value={identificadorRotaUrl(l.rota)}>
+                {l.rota.codigo} — {l.rota.ciclo === "par" ? "par" : "ímpar"} — região{" "}
+                {l.rota.regiao} — {reaisLitro(l.ind.custoLitro)}
               </option>
             ))}
           </select>
@@ -75,7 +77,7 @@ function SimuladorIndex() {
           </thead>
           <tbody>
             {ordenadas.map((l) => (
-              <tr key={l.rota.codigo} className="border-t border-border hover:bg-surface/60">
+              <tr key={chaveRota(l.rota)} className="border-t border-border hover:bg-surface/60">
                 <td className="py-3 pl-4 pr-3 text-sm">{l.rota.codigo}</td>
                 <td className="px-3 py-3 text-sm">{l.rota.regiao}</td>
                 <td className="px-3 py-3 text-sm">{l.equipamento.nome}</td>
@@ -86,7 +88,7 @@ function SimuladorIndex() {
                 <td className="py-3 pl-3 pr-4 text-right">
                   <Link
                     to="/simulador/$codigo"
-                    params={{ codigo: l.rota.codigo }}
+                    params={{ codigo: identificadorRotaUrl(l.rota) }}
                     className="text-sm text-primary hover:underline"
                   >
                     Abrir simulação

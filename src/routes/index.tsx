@@ -6,6 +6,7 @@ import { useDados } from "@/lib/data/store";
 import { agregarRotas, agruparPorRegiao } from "@/lib/calculations/regionalAggregation";
 import { densidadeFmt, km as fmtKm, litros, reais, reaisLitro } from "@/lib/format";
 import { formatarHoras } from "@/lib/calculations/routeJourney";
+import { chaveRota, identificadorRotaUrl } from "@/lib/data/identity";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -19,7 +20,8 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "Visão Geral da Operação | CCPR CONECTA" },
       {
         property: "og:description",
-        content: "Painel operacional da malha de rotas da unidade com indicadores de custo e jornada.",
+        content:
+          "Painel operacional da malha de rotas da unidade com indicadores de custo e jornada.",
       },
     ],
   }),
@@ -46,7 +48,11 @@ function VisaoGeral() {
         titulo="Visão Geral da Operação"
         descricao={`Roteirização atual da unidade ${unidade?.id ?? ""} — ${unidade?.nome ?? ""}. Os indicadores refletem os dados carregados hoje.`}
         acoes={
-          temDadosMock ? <Tag tom="atencao">DADOS DE TESTE</Tag> : <Tag tom="primario">DADO REAL</Tag>
+          temDadosMock ? (
+            <Tag tom="atencao">DADOS DE TESTE</Tag>
+          ) : (
+            <Tag tom="primario">DADO REAL</Tag>
+          )
         }
       />
 
@@ -88,10 +94,12 @@ function VisaoGeral() {
               </thead>
               <tbody>
                 {maisCaras.map((l) => (
-                  <tr key={l.rota.codigo} className="border-t border-border">
+                  <tr key={chaveRota(l.rota)} className="border-t border-border">
                     <td className="py-3 pl-4 pr-3 text-sm text-foreground">{l.rota.codigo}</td>
                     <td className="px-3 py-3 text-sm text-muted-foreground">{l.rota.regiao}</td>
-                    <td className="px-3 py-3 text-right text-sm tabular">{litros(l.ind.volumeL)}</td>
+                    <td className="px-3 py-3 text-right text-sm tabular">
+                      {litros(l.ind.volumeL)}
+                    </td>
                     <td className="px-3 py-3 text-right text-sm tabular text-foreground">
                       {reaisLitro(l.ind.custoLitro)}
                     </td>
@@ -105,7 +113,7 @@ function VisaoGeral() {
                     <td className="py-3 pl-3 pr-4 text-right">
                       <Link
                         to="/simulador/$codigo"
-                        params={{ codigo: l.rota.codigo }}
+                        params={{ codigo: identificadorRotaUrl(l.rota) }}
                         className="text-sm text-primary hover:underline"
                       >
                         Simular

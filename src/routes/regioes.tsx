@@ -5,6 +5,7 @@ import { Kpi, KpiGrid, Tag } from "@/components/ui-ccpr/Kpi";
 import { useLinhasRota } from "@/lib/data/selectors";
 import { agregarRotas, agruparPorRegiao } from "@/lib/calculations/regionalAggregation";
 import { densidadeFmt, km as fmtKm, litros, reais, reaisLitro } from "@/lib/format";
+import { chaveRota, identificadorRotaUrl } from "@/lib/data/identity";
 
 export const Route = createFileRoute("/regioes")({
   head: () => ({
@@ -105,11 +106,11 @@ function Regioes() {
                 </thead>
                 <tbody>
                   {r.linhas.map((l) => (
-                    <tr key={l.rota.codigo} className="border-t border-border">
+                    <tr key={chaveRota(l.rota)} className="border-t border-border">
                       <td className="py-3 pl-4 pr-3 text-sm">
                         <Link
                           to="/rota/$codigo"
-                          params={{ codigo: l.rota.codigo }}
+                          params={{ codigo: identificadorRotaUrl(l.rota) }}
                           className="text-primary hover:underline"
                         >
                           {l.rota.codigo}
@@ -135,7 +136,7 @@ function Regioes() {
                       <td className="py-3 pl-3 pr-4 text-right">
                         <Link
                           to="/simulador/$codigo"
-                          params={{ codigo: l.rota.codigo }}
+                          params={{ codigo: identificadorRotaUrl(l.rota) }}
                           className="text-sm text-primary hover:underline"
                         >
                           Simular

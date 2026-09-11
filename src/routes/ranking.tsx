@@ -6,6 +6,7 @@ import { useLinhasRota } from "@/lib/data/selectors";
 import { densidadeFmt, km as fmtKm, litros, reais, reaisLitro } from "@/lib/format";
 import { formatarHoras } from "@/lib/calculations/routeJourney";
 import { MoreHorizontal } from "lucide-react";
+import { chaveRota, identificadorRotaUrl } from "@/lib/data/identity";
 
 export const Route = createFileRoute("/ranking")({
   head: () => ({
@@ -34,10 +35,7 @@ function Ranking() {
   const [ciclo, setCiclo] = useState<"todos" | "par" | "impar">("todos");
   const [busca, setBusca] = useState("");
 
-  const regioes = useMemo(
-    () => [...new Set(linhas.map((l) => l.rota.regiao))].sort(),
-    [linhas],
-  );
+  const regioes = useMemo(() => [...new Set(linhas.map((l) => l.rota.regiao))].sort(), [linhas]);
 
   const filtradas = useMemo(
     () =>
@@ -129,12 +127,12 @@ function Ranking() {
           </thead>
           <tbody>
             {filtradas.map((l, i) => (
-              <tr key={l.rota.codigo} className="border-t border-border hover:bg-surface/60">
+              <tr key={chaveRota(l.rota)} className="border-t border-border hover:bg-surface/60">
                 <td className="py-3 pl-4 pr-3 text-sm tabular text-muted-foreground">{i + 1}</td>
                 <td className="px-3 py-3 text-sm">
                   <Link
                     to="/rota/$codigo"
-                    params={{ codigo: l.rota.codigo }}
+                    params={{ codigo: identificadorRotaUrl(l.rota) }}
                     className="text-primary hover:underline"
                   >
                     {l.rota.codigo}
@@ -171,7 +169,7 @@ function Ranking() {
                 <td className="py-3 pl-3 pr-4 text-right">
                   <Link
                     to="/simulador/$codigo"
-                    params={{ codigo: l.rota.codigo }}
+                    params={{ codigo: identificadorRotaUrl(l.rota) }}
                     aria-label={`Simular rota ${l.rota.codigo}`}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
                   >

@@ -8,6 +8,7 @@ import { agregarRotas } from "@/lib/calculations/regionalAggregation";
 import { simularRota } from "@/lib/calculations/simulation";
 import { formatarHoras } from "@/lib/calculations/routeJourney";
 import { densidadeFmt, km as fmtKm, litros, reais, reaisLitro, variacao } from "@/lib/format";
+import { chaveRota } from "@/lib/data/identity";
 
 export const Route = createFileRoute("/relatorios")({
   head: () => ({
@@ -40,7 +41,9 @@ function Relatorios() {
     return simulacoes
       .filter((s) => s.aplicado)
       .flatMap((s) => {
-        const linha = linhas.find((l) => l.rota.codigo === s.rotaCodigo);
+        const linha = linhas.find(
+          (l) => l.rota.codigo === s.rotaCodigo && (!s.rotaCiclo || l.rota.ciclo === s.rotaCiclo),
+        );
         if (!linha) return [];
         const r = simularRota(linha.rota, {
           aumentoVolumeL: s.aumentoVolumeL,
@@ -205,7 +208,7 @@ function Relatorios() {
             </thead>
             <tbody>
               {criticas.map((l) => (
-                <tr key={l.rota.codigo} className="border-t border-border">
+                <tr key={chaveRota(l.rota)} className="border-t border-border">
                   <td className="py-3 pl-4 pr-3 text-sm">{l.rota.codigo}</td>
                   <td className="px-3 py-3 text-sm">{l.rota.regiao}</td>
                   <td className="px-3 py-3 text-sm">

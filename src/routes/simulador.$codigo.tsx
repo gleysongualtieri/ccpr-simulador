@@ -8,22 +8,26 @@ import { simularRota } from "@/lib/calculations/simulation";
 import { EQUIPAMENTOS } from "@/lib/calculations/equipment";
 import { DESCRICAO_SUFIXO, equipamentosCompativeis } from "@/lib/calculations/compatibility";
 import { litros, percentual, reaisLitro } from "@/lib/format";
+import { encontrarRotaPorIdentificador, identificadorRotaUrl } from "@/lib/data/identity";
 
 export const Route = createFileRoute("/simulador/$codigo")({
-  head: ({ params }) => ({
-    meta: [
-      { title: `Simulação da rota ${params.codigo} | CCPR CONECTA` },
-      {
-        name: "description",
-        content: `Simule volume, km e equipamento na rota ${params.codigo} e compare o resultado com a operação atual.`,
-      },
-      { property: "og:title", content: `Simulação da rota ${params.codigo} | CCPR CONECTA` },
-      {
-        property: "og:description",
-        content: `Comparação atual × simulado da rota ${params.codigo}.`,
-      },
-    ],
-  }),
+  head: ({ params }) => {
+    const codigoExibido = params.codigo.replace(/--(?:par|impar)$/, "");
+    return {
+      meta: [
+        { title: `Simulação da rota ${codigoExibido} | CCPR CONECTA` },
+        {
+          name: "description",
+          content: `Simule volume, km e equipamento na rota ${codigoExibido} e compare o resultado com a operação atual.`,
+        },
+        { property: "og:title", content: `Simulação da rota ${codigoExibido} | CCPR CONECTA` },
+        {
+          property: "og:description",
+          content: `Comparação atual × simulado da rota ${codigoExibido}.`,
+        },
+      ],
+    };
+  },
   component: SimuladorRota,
 });
 
@@ -31,17 +35,14 @@ function SimuladorRota() {
   const { codigo } = Route.useParams();
   const rotas = useRotasUnidade();
   const { registrarSimulacao } = useDados();
-  const rota = rotas.find((r) => r.codigo === codigo);
+  const rota = encontrarRotaPorIdentificador(rotas, codigo);
 
   const [aumentoVolumeL, setAumentoVolumeL] = useState(0);
   const [aumentoKm, setAumentoKm] = useState(0);
   const [equipamentoIdSimulado, setEquipamentoIdSimulado] = useState(rota?.equipamentoId ?? "");
   const [salvo, setSalvo] = useState(false);
 
-  const compativeis = useMemo(
-    () => (rota ? equipamentosCompativeis(rota.sufixoTipo) : []),
-    [rota],
-  );
+  const compativeis = useMemo(() => (rota ? equipamentosCompativeis(rota.sufixoTipo) : []), [rota]);
 
   const resultado = useMemo(
     () =>
@@ -71,7 +72,10 @@ function SimuladorRota() {
   }
 
   const semAlteracao =
-    aumentoVolumeL === 0 && aumentoKm === 0 && resultado.equipamentoSimulado.id === rota.equipamentoId;
+    aumentoVolumeL === 0 &&
+    aumentoKm === 0 &&
+    resultado.equipamentoSimulado.id === rota.equipamentoId;
+  const bloqueada = !resultado.compativel || resultado.capacidade.excedida;
 
   return (
     <>
@@ -81,7 +85,7 @@ function SimuladorRota() {
         acoes={
           <Link
             to="/rota/$codigo"
-            params={{ codigo: rota.codigo }}
+            params={{ codigo: identificadorRotaUrl(rota) }}
             className="inline-flex h-11 items-center rounded-md border border-border px-5 text-sm text-foreground transition-colors hover:bg-surface"
           >
             Ver detalhe da rota
@@ -162,10 +166,11 @@ function SimuladorRota() {
             <div className="flex flex-wrap gap-3 border-t border-border pt-4">
               <button
                 type="button"
-                disabled={semAlteracao}
+                disabled={semAlteracao || bloqueada}
                 onClick={() => {
                   registrarSimulacao({
                     rotaCodigo: rota.codigo,
+                    rotaCiclo: rota.ciclo,
                     aumentoVolumeL,
                     aumentoKm,
                     equipamentoIdSimulado: resultado.equipamentoSimulado.id,
@@ -196,6 +201,11 @@ function SimuladorRota() {
                 <Link to="/simulador" className="underline">
                   Ver histórico
                 </Link>
+              </p>
+            ) : null}
+            {bloqueada ? (
+              <p className="text-sm text-destructive">
+                Corrija a incompatibilidade ou o excesso de capacidade antes de registrar.
               </p>
             ) : null}
           </div>

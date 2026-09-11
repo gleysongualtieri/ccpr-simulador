@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { Produtor, RotaOperacional, SimulacaoRapida, Unidade } from "@/lib/domain/types";
 import { PRODUTORES_MOCK, ROTAS_MOCK, UNIDADES } from "./seed";
+import { chaveProdutorRota, chaveRota } from "./identity";
 
 /**
  * Repositório de dados da aplicação.
@@ -93,14 +94,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setEstado((prev) => {
       const reais = prev.rotas.filter((r) => !r.origem.mock);
       const produtoresReais = prev.produtores.filter(
-        (p) => !PRODUTORES_MOCK.some((m) => m.codigo === p.codigo && m.rotaCodigo === p.rotaCodigo),
+        (p) => !PRODUTORES_MOCK.some((m) => chaveProdutorRota(m) === chaveProdutorRota(p)),
       );
-      const mapaRotas = new Map(reais.map((r) => [r.codigo, r]));
-      for (const r of rotas) mapaRotas.set(r.codigo, r);
+      const mapaRotas = new Map(reais.map((r) => [chaveRota(r), r]));
+      for (const r of rotas) mapaRotas.set(chaveRota(r), r);
       const novasRotas = [...mapaRotas.values()];
 
-      const mapaProd = new Map(produtoresReais.map((p) => [`${p.codigo}@${p.rotaCodigo}`, p]));
-      for (const p of produtores) mapaProd.set(`${p.codigo}@${p.rotaCodigo}`, p);
+      const mapaProd = new Map(produtoresReais.map((p) => [chaveProdutorRota(p), p]));
+      for (const p of produtores) mapaProd.set(chaveProdutorRota(p), p);
 
       const unidades = unidadesDe(novasRotas);
       return {

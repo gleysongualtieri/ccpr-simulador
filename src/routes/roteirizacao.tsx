@@ -8,6 +8,7 @@ import { agregarRotas } from "@/lib/calculations/regionalAggregation";
 import { DESCRICAO_SUFIXO } from "@/lib/calculations/compatibility";
 import { densidadeFmt, km as fmtKm, litros, percentual, reaisLitro } from "@/lib/format";
 import { formatarHoras } from "@/lib/calculations/routeJourney";
+import { chaveRota, identificadorRotaUrl } from "@/lib/data/identity";
 
 export const Route = createFileRoute("/roteirizacao")({
   head: () => ({
@@ -99,11 +100,11 @@ function Roteirizacao() {
           </thead>
           <tbody>
             {filtradas.map((l) => (
-              <tr key={l.rota.codigo} className="border-t border-border hover:bg-surface/60">
+              <tr key={chaveRota(l.rota)} className="border-t border-border hover:bg-surface/60">
                 <td className="py-3 pl-4 pr-3 text-sm">
                   <Link
                     to="/rota/$codigo"
-                    params={{ codigo: l.rota.codigo }}
+                    params={{ codigo: identificadorRotaUrl(l.rota) }}
                     className="text-primary hover:underline"
                   >
                     {l.rota.codigo}

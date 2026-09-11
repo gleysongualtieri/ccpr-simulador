@@ -32,6 +32,12 @@ export interface Produtor {
   matricula: string;
   volumeL: number;
   rotaCodigo: string;
+  /** Unidade extraída do código do veículo no Produtores_Rotas. */
+  unidadeId?: string | undefined;
+  /** Ciclo derivado da data da coleta no arquivo Produtores_Rotas. */
+  ciclo?: "par" | "impar" | undefined;
+  /** ISO — data/hora da coleta, quando disponível no arquivo de origem. */
+  dataColeta?: string | undefined;
 }
 
 export interface TrechoJornada {
@@ -66,9 +72,11 @@ export interface RotaOperacional {
   /** Rastreabilidade */
   origem: OrigemDado;
   /** Capacidade real do veículo (cavalo + reboque, quando houver) */
-  capacidadeRealL?: number;
+  capacidadeRealL?: number | undefined;
   /** Capacidade nominal do cavalo (sem reboque) */
-  capacidadeNominalL?: number;
+  capacidadeNominalL?: number | undefined;
+  /** Capacidade do reboque escolhida para esta execução de rota R. */
+  capacidadeReboqueL?: number | undefined;
 }
 
 export interface OrigemDado {
@@ -86,6 +94,7 @@ export interface Unidade {
 export interface SimulacaoRapida {
   id: string;
   rotaCodigo: string;
+  rotaCiclo?: "par" | "impar" | undefined;
   criadaEm: string;
   aumentoVolumeL: number;
   aumentoKm: number;

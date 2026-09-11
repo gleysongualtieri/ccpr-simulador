@@ -7,22 +7,26 @@ import { DESCRICAO_SUFIXO } from "@/lib/calculations/compatibility";
 import { decodificarVeiculo } from "@/lib/calculations/equipment";
 import { formatarHoras, LIMITE_JORNADA_H } from "@/lib/calculations/routeJourney";
 import { densidadeFmt, km as fmtKm, litros, percentual, reais, reaisLitro } from "@/lib/format";
+import { encontrarRotaPorIdentificador, identificadorRotaUrl } from "@/lib/data/identity";
 
 export const Route = createFileRoute("/rota/$codigo")({
-  head: ({ params }) => ({
-    meta: [
-      { title: `Rota ${params.codigo} | Simulador Operacional CCPR` },
-      {
-        name: "description",
-        content: `Detalhe operacional da rota ${params.codigo}: produtores, volume, km, equipamento, custo e jornada.`,
-      },
-      { property: "og:title", content: `Rota ${params.codigo} | CCPR CONECTA` },
-      {
-        property: "og:description",
-        content: `Indicadores e produtores da rota ${params.codigo}.`,
-      },
-    ],
-  }),
+  head: ({ params }) => {
+    const codigoExibido = params.codigo.replace(/--(?:par|impar)$/, "");
+    return {
+      meta: [
+        { title: `Rota ${codigoExibido} | Simulador Operacional CCPR` },
+        {
+          name: "description",
+          content: `Detalhe operacional da rota ${codigoExibido}: produtores, volume, km, equipamento, custo e jornada.`,
+        },
+        { property: "og:title", content: `Rota ${codigoExibido} | CCPR CONECTA` },
+        {
+          property: "og:description",
+          content: `Indicadores e produtores da rota ${codigoExibido}.`,
+        },
+      ],
+    };
+  },
   component: DetalheRota,
 });
 
@@ -30,7 +34,11 @@ function DetalheRota() {
   const { codigo } = Route.useParams();
   const linhas = useLinhasRota();
   const { produtores } = useDados();
-  const linha = linhas.find((l) => l.rota.codigo === codigo);
+  const rotaEncontrada = encontrarRotaPorIdentificador(
+    linhas.map((linha) => linha.rota),
+    codigo,
+  );
+  const linha = linhas.find((item) => item.rota === rotaEncontrada);
 
   if (!linha) {
     return (
@@ -45,7 +53,12 @@ function DetalheRota() {
 
   const { rota, equipamento, ind, jornada } = linha;
   const veiculo = decodificarVeiculo(rota.veiculo);
-  const daRota = produtores.filter((p) => p.rotaCodigo === rota.codigo);
+  const daRota = produtores.filter(
+    (p) =>
+      p.rotaCodigo === rota.codigo &&
+      (!p.unidadeId || p.unidadeId === rota.unidadeId) &&
+      (!p.ciclo || p.ciclo === rota.ciclo),
+  );
 
   return (
     <>
@@ -59,7 +72,7 @@ function DetalheRota() {
             </Tag>
             <Link
               to="/simulador/$codigo"
-              params={{ codigo: rota.codigo }}
+              params={{ codigo: identificadorRotaUrl(rota) }}
               className="inline-flex h-11 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               Simular
@@ -204,7 +217,10 @@ function DetalheRota() {
             </thead>
             <tbody>
               {daRota.map((p) => (
-                <tr key={p.codigo} className="border-t border-border">
+                <tr
+                  key={`${p.codigo}-${p.rotaCodigo}-${p.ciclo ?? "sem-ciclo"}`}
+                  className="border-t border-border"
+                >
                   <td className="py-3 pl-4 pr-3 text-sm tabular">{p.codigo}</td>
                   <td className="px-3 py-3 text-sm">{p.nome}</td>
                   <td className="px-3 py-3 text-sm">{p.cooperativa}</td>

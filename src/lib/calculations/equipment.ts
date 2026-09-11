@@ -1,4 +1,4 @@
-import type { Equipamento } from "@/lib/domain/types";
+import type { Equipamento } from "../domain/types.ts";
 
 /**
  * Tabela de referência de equipamentos — fonte única do motor de cálculo
@@ -14,6 +14,15 @@ export const EQUIPAMENTOS: Equipamento[] = [
     diaria: 450,
     custoKm: 3.2,
     siglas: ["TO"],
+  },
+  {
+    id: "bitoco",
+    nome: "Bitoco",
+    tipo: "solteiro",
+    capacidadeL: 13000,
+    diaria: 0,
+    custoKm: 0,
+    siglas: ["BC"],
   },
   {
     id: "truck",
@@ -41,6 +50,15 @@ export const EQUIPAMENTOS: Equipamento[] = [
     diaria: 700,
     custoKm: 5.1,
     siglas: ["TO+RB"],
+  },
+  {
+    id: "bitoco_reboque",
+    nome: "Bitoco + Reboque",
+    tipo: "reboque",
+    capacidadeL: 25000,
+    diaria: 0,
+    custoKm: 0,
+    siglas: ["BC+RB"],
   },
   {
     id: "truck_reboque",
@@ -73,10 +91,10 @@ export const EQUIPAMENTOS: Equipamento[] = [
     id: "bitrem",
     nome: "Bitrem",
     tipo: "especial",
-    capacidadeL: 45000,
+    capacidadeL: 36000,
     diaria: 1050,
     custoKm: 7.2,
-    siglas: ["BI"],
+    siglas: ["BR"],
   },
   {
     id: "vanderleia",
@@ -109,9 +127,10 @@ const SIGLAS_ALTERNATIVAS: Record<string, string> = {
   BK: "BT",
   CR: "CA",
   VD: "VA",
-  BR: "BI",
-  RT: "BI",
 };
+
+/** Sugestões atuais; o campo de importação também aceita novas capacidades. */
+export const CAPACIDADES_REBOQUE_INICIAIS_L = [12000, 15000, 18000, 21000] as const;
 
 export interface VeiculoDecodificado {
   unidade: string;
