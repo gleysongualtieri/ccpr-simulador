@@ -18,6 +18,7 @@ import type {
 import { PRODUTORES_MOCK, ROTAS_MOCK, UNIDADES } from "./seed";
 import { chaveProdutorRota, chaveRota } from "./identity";
 import { associarTransportadorasImportadas, TRANSPORTADORAS_INICIAIS } from "./tariffs";
+import { lerEstadoPersistido } from "./persistence";
 
 /**
  * Repositório de dados da aplicação.
@@ -70,7 +71,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const bruto = localStorage.getItem(CHAVE);
-      if (bruto) setEstado({ ...estadoInicial, ...(JSON.parse(bruto) as Estado) });
+      const salvo = bruto ? lerEstadoPersistido(bruto) : null;
+      if (salvo) setEstado({ ...estadoInicial, ...salvo });
     } catch {
       /* base local corrompida — mantém o estado padrão */
     }

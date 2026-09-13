@@ -12,7 +12,11 @@ import {
   importarRouteNow,
 } from "@/lib/data/import";
 import type { ProblemaQualidade, Produtor, RotaOperacional } from "@/lib/domain/types";
-import { CAPACIDADES_REBOQUE_INICIAIS_L, getEquipamento } from "@/lib/calculations/equipment";
+import {
+  CAPACIDADE_MAXIMA_REBOQUE_L,
+  CAPACIDADES_REBOQUE_INICIAIS_L,
+  getEquipamento,
+} from "@/lib/calculations/equipment";
 import { litros } from "@/lib/format";
 
 export const Route = createFileRoute("/importacao")({
@@ -335,12 +339,20 @@ function Importacao() {
                             <input
                               type="number"
                               min={1000}
+                              max={CAPACIDADE_MAXIMA_REBOQUE_L}
                               step={1000}
                               list="capacidades-reboque"
                               value={r.capacidadeReboqueL ?? ""}
                               onChange={(e) => {
                                 const valor = Number(e.target.value);
-                                informarCapacidadeReboque(indice, valor > 0 ? valor : undefined);
+                                informarCapacidadeReboque(
+                                  indice,
+                                  Number.isFinite(valor) &&
+                                    valor > 0 &&
+                                    valor <= CAPACIDADE_MAXIMA_REBOQUE_L
+                                    ? valor
+                                    : undefined,
+                                );
                               }}
                               aria-label={`Capacidade do reboque da rota ${r.codigo}`}
                               className="h-9 w-32 rounded-md border border-border bg-card px-2 text-right tabular"

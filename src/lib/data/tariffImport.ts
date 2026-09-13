@@ -1,5 +1,6 @@
 import type { ProblemaQualidade, TarifaTransporte } from "../domain/types.ts";
 import {
+  categoriaReboquePorTipoTarifa,
   cnpjValido,
   equipamentoIdPorTipoTarifa,
   normalizarCnpj,
@@ -173,6 +174,7 @@ export function importarMatrizTarifas(
     }
 
     const equipamentoId = equipamentoIdPorTipoTarifa(tipoOrigem);
+    const categoriaReboque = categoriaReboquePorTipoTarifa(tipoOrigem);
     const tipoNormalizado = normalizarTipoTarifa(tipoOrigem);
     if (!equipamentoId && !["MOTORISTA_EXTRA", "ADICIONAL_NOTURNO"].includes(tipoNormalizado))
       tiposNaoMapeados.set(tipoOrigem, (tiposNaoMapeados.get(tipoOrigem) ?? 0) + 1);
@@ -192,6 +194,7 @@ export function importarMatrizTarifas(
       codigoTarifa: texto(linha[indices.codigoTarifa]),
       tipoOrigem,
       ...(equipamentoId ? { equipamentoId } : {}),
+      ...(categoriaReboque ? { categoriaReboque } : {}),
       inicioVigencia: inicioVigencia!,
       ...(fimVigencia ? { fimVigencia } : {}),
       ...(diaria !== undefined ? { diaria } : {}),

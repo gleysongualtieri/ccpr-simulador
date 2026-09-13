@@ -7,6 +7,8 @@ export type SufixoRota = "D" | "R" | "A" | "B" | "C" | "E" | "S";
 
 export type TipoEquipamento = "solteiro" | "reboque" | "especial";
 
+export type CategoriaReboque = "comum" | "trucado";
+
 export interface Equipamento {
   /** Identificador estável usado nas rotas e simulações */
   id: string;
@@ -41,6 +43,8 @@ export interface TarifaTransporte {
   tipoOrigem: string;
   /** Ausente para adicionais ou tipos ainda sem equivalência operacional confirmada. */
   equipamentoId?: string | undefined;
+  /** Diferencia reboque comum (12/15 mil L) de trucado (18/21 mil L). */
+  categoriaReboque?: CategoriaReboque | undefined;
   inicioVigencia: string;
   fimVigencia?: string | undefined;
   diaria?: number | undefined;

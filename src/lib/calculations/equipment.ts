@@ -131,6 +131,7 @@ const SIGLAS_ALTERNATIVAS: Record<string, string> = {
 
 /** Sugestões atuais; o campo de importação também aceita novas capacidades. */
 export const CAPACIDADES_REBOQUE_INICIAIS_L = [12000, 15000, 18000, 21000] as const;
+export const CAPACIDADE_MAXIMA_REBOQUE_L = 100_000;
 
 export interface VeiculoDecodificado {
   unidade: string;

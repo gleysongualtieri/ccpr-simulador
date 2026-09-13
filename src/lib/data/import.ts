@@ -1,5 +1,7 @@
 import type { OrigemDado, Produtor, ProblemaQualidade, RotaOperacional } from "../domain/types.ts";
 import {
+  CAPACIDADE_MAXIMA_REBOQUE_L,
+  CAPACIDADES_REBOQUE_INICIAIS_L,
   equipamentoPorSigla,
   decodificarVeiculo,
   getEquipamento,
@@ -13,10 +15,17 @@ import { extrairSufixo, isCompativel } from "../calculations/compatibility.ts";
  */
 
 export type TipoArquivo = "route_now" | "produtores_rotas";
+export const LIMITE_REGISTROS_POR_ARQUIVO = 20_000;
 
 /** Identifica o arquivo pelo cabeçalho, sem depender do nome escolhido pelo usuário. */
 export function identificarTipoArquivo(texto: string): TipoArquivo | null {
-  const cabecalho = parseDelimitado(texto)[0];
+  const primeiraLinha = limparTexto(texto)
+    .slice(0, 50_000)
+    .split("\n")
+    .find((linha) => linha.trim().length > 0);
+  const cabecalho = primeiraLinha
+    ? parseLinhaCsv(primeiraLinha, detectarDelimitador(primeiraLinha))
+    : undefined;
   if (!cabecalho) return null;
   const tem = (...nomes: string[]) => indice(cabecalho, ...nomes) >= 0;
   if (tem("rota") && tem("atividade", "atividde") && tem("matricula") && tem("km etapa")) {
@@ -49,7 +58,7 @@ function limparTexto(texto: string): string {
 
 /** Escolhe o delimitador mais provável olhando as primeiras linhas. */
 function detectarDelimitador(texto: string): string {
-  const amostra = texto.split("\n").slice(0, 5).join("\n");
+  const amostra = texto.slice(0, 50_000).split("\n").slice(0, 5).join("\n");
   const contadores = [
     { d: ";", n: (amostra.match(/;/g) ?? []).length },
     { d: ",", n: (amostra.match(/,/g) ?? []).length },
@@ -93,6 +102,32 @@ export function parseDelimitado(texto: string): string[][] {
   if (linhas.length === 0) return [];
   const delimitador = detectarDelimitador(limpo);
   return linhas.map((l) => parseLinhaCsv(l, delimitador));
+}
+
+function excedeLimiteDeRegistros(texto: string): boolean {
+  let linhasComConteudo = 0;
+  for (const linha of limparTexto(texto).split("\n")) {
+    if (!linha.trim()) continue;
+    linhasComConteudo += 1;
+    if (linhasComConteudo > LIMITE_REGISTROS_POR_ARQUIVO + 1) return true;
+  }
+  return false;
+}
+
+function problemaLimiteDeRegistros(arquivo: string): PreviaImportacao {
+  return {
+    rotas: [],
+    produtores: [],
+    problemas: [
+      {
+        severidade: "erro",
+        entidade: arquivo,
+        campo: "arquivo",
+        mensagem: `Arquivo acima do limite de ${LIMITE_REGISTROS_POR_ARQUIVO.toLocaleString("pt-BR")} registros.`,
+      },
+    ],
+    linhasLidas: 0,
+  };
 }
 
 function normalizar(texto: string): string {
@@ -232,6 +267,7 @@ export function importarRouteNow(
   unidadeIdPadrao: string,
   anoReferencia = new Date().getFullYear(),
 ): PreviaImportacao {
+  if (excedeLimiteDeRegistros(texto)) return problemaLimiteDeRegistros(arquivo);
   const linhas = parseDelimitado(texto);
   const problemas: ProblemaQualidade[] = [];
   const rotas: RotaOperacional[] = [];
@@ -504,6 +540,7 @@ export function importarProdutoresRotas(
   arquivo: string,
   anoReferencia = new Date().getFullYear(),
 ): PreviaImportacao {
+  if (excedeLimiteDeRegistros(texto)) return problemaLimiteDeRegistros(arquivo);
   const linhas = parseDelimitado(texto);
   const problemas: ProblemaQualidade[] = [];
   const produtores: Produtor[] = [];
@@ -706,6 +743,30 @@ export function auditarBase(rotas: RotaOperacional[], produtores: Produtor[]): P
         entidade: rota.codigo,
         campo: "reboque",
         mensagem: "Informe a capacidade do reboque desta rota R.",
+      });
+    }
+    if (
+      rota.capacidadeReboqueL !== undefined &&
+      (!Number.isFinite(rota.capacidadeReboqueL) ||
+        rota.capacidadeReboqueL <= 0 ||
+        rota.capacidadeReboqueL > CAPACIDADE_MAXIMA_REBOQUE_L)
+    ) {
+      problemas.push({
+        severidade: "erro",
+        entidade: rota.codigo,
+        campo: "reboque",
+        mensagem: `A capacidade do reboque deve estar entre 1 e ${CAPACIDADE_MAXIMA_REBOQUE_L.toLocaleString("pt-BR")} L.`,
+      });
+    } else if (
+      rota.capacidadeReboqueL !== undefined &&
+      !(CAPACIDADES_REBOQUE_INICIAIS_L as readonly number[]).includes(rota.capacidadeReboqueL)
+    ) {
+      problemas.push({
+        severidade: "alerta",
+        entidade: rota.codigo,
+        campo: "reboque",
+        mensagem:
+          "Capacidade de reboque fora das opções atuais. Confirme se existe tarifa oficial correspondente.",
       });
     }
     const capacidadeRealL = rota.capacidadeRealL;

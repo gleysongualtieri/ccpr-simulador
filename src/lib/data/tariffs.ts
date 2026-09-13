@@ -1,4 +1,5 @@
 import type {
+  CategoriaReboque,
   Equipamento,
   ProblemaQualidade,
   RotaOperacional,
@@ -36,7 +37,9 @@ const TIPO_PARA_EQUIPAMENTO: Record<string, string> = {
   TRUCK: "truck",
   BITRUCK: "bitruck",
   TOCO_REBOQUE: "toco_reboque",
+  TOCO_REBOQUE_TRUCK: "toco_reboque",
   TRUCK_REBOQUE: "truck_reboque",
+  TRUCK_REBOQUE_TRUCK: "truck_reboque",
   BITRUCK_REBOQUE: "bitruck_reboque",
   CAVALO_MOTOR_CARRETA: "carreta",
   CAVALO_MOTOR_VANDERLEIA: "vanderleia",
@@ -58,6 +61,21 @@ export function normalizarTipoTarifa(valor: unknown): string {
 
 export function equipamentoIdPorTipoTarifa(valor: unknown): string | undefined {
   return TIPO_PARA_EQUIPAMENTO[normalizarTipoTarifa(valor)];
+}
+
+export function categoriaReboquePorTipoTarifa(valor: unknown): CategoriaReboque | undefined {
+  const tipo = normalizarTipoTarifa(valor);
+  if (tipo.endsWith("_REBOQUE_TRUCK")) return "trucado";
+  if (tipo.endsWith("_REBOQUE")) return "comum";
+  return undefined;
+}
+
+export function categoriaReboquePorCapacidade(
+  capacidadeReboqueL: number | undefined,
+): CategoriaReboque | undefined {
+  if (capacidadeReboqueL === 12000 || capacidadeReboqueL === 15000) return "comum";
+  if (capacidadeReboqueL === 18000 || capacidadeReboqueL === 21000) return "trucado";
+  return undefined;
 }
 
 export function somenteDigitos(valor: unknown): string {
@@ -168,11 +186,15 @@ export function resolverTarifaRota(
   );
   const data = rota.dataExecucao?.slice(0, 10) || new Date().toISOString().slice(0, 10);
   const cnpjs = new Set(transportadora?.cnpjs ?? []);
+  const categoriaReboque =
+    base.tipo === "reboque" ? categoriaReboquePorCapacidade(rota.capacidadeReboqueL) : undefined;
   const candidatas = tarifas
     .filter(
       (tarifa) =>
         tarifa.unidadeId === rota.unidadeId &&
         tarifa.equipamentoId === equipamentoId &&
+        (base.tipo !== "reboque" ||
+          (categoriaReboque !== undefined && tarifa.categoriaReboque === categoriaReboque)) &&
         cnpjs.has(tarifa.cnpj) &&
         tarifa.inicioVigencia <= data &&
         (!tarifa.fimVigencia || tarifa.fimVigencia >= data),

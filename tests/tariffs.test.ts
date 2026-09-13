@@ -87,7 +87,7 @@ test("consolida duplicata pela atualização mais recente", () => {
   assert.equal(r.tarifas[0]?.diaria, 1143.0366);
 });
 
-test("mantém tipo ambíguo sem aplicar a equipamento", () => {
+test("mapeia reboque trucado para o conjunto e registra sua categoria", () => {
   const r = importarMatrizTarifas(
     [
       CABECALHO,
@@ -95,8 +95,60 @@ test("mantém tipo ambíguo sem aplicar a equipamento", () => {
     ],
     "tarifas.xlsx",
   );
-  assert.equal(r.tarifas[0]?.equipamentoId, undefined);
-  assert.ok(r.problemas.some((p) => p.campo === "TIPO"));
+  assert.equal(r.tarifas[0]?.equipamentoId, "toco_reboque");
+  assert.equal(r.tarifas[0]?.categoriaReboque, "trucado");
+  assert.ok(!r.problemas.some((p) => p.campo === "TIPO"));
+});
+
+test("seleciona tarifa de reboque comum ou trucado pela capacidade informada", () => {
+  const r = importarMatrizTarifas(
+    [
+      CABECALHO,
+      linha("TOCO_REBOQUE", "2026-06-01 00:00:00", 1300, 3.5, "2026-06-15 20:00:00"),
+      linha("TOCO_REBOQUE TRUCK", "2026-06-01 00:00:00", 1500, 4.3, "2026-06-15 20:00:00"),
+    ],
+    "tarifas.xlsx",
+  );
+  const transportadoras = associarTransportadorasImportadas(TRANSPORTADORAS_INICIAIS, r.tarifas);
+  const rotaComum = {
+    ...rotaBase,
+    equipamentoId: "toco_reboque",
+    capacidadeReboqueL: 15000,
+  };
+  const rotaTrucada = { ...rotaComum, capacidadeReboqueL: 18000 };
+
+  assert.equal(
+    resolverTarifaRota(rotaComum, "toco_reboque", r.tarifas, transportadoras)?.tarifa
+      ?.categoriaReboque,
+    "comum",
+  );
+  assert.equal(
+    resolverTarifaRota(rotaTrucada, "toco_reboque", r.tarifas, transportadoras)?.tarifa
+      ?.categoriaReboque,
+    "trucado",
+  );
+});
+
+test("não escolhe tarifa de conjunto antes de informar o reboque", () => {
+  const r = importarMatrizTarifas(
+    [
+      CABECALHO,
+      linha("TRUCK_REBOQUE", "2026-06-01 00:00:00", 1300, 3.5, "2026-06-15 20:00:00"),
+      linha("TRUCK_REBOQUE TRUCK", "2026-06-01 00:00:00", 1500, 4.3, "2026-06-15 20:00:00"),
+    ],
+    "tarifas.xlsx",
+  );
+  const transportadoras = associarTransportadorasImportadas(TRANSPORTADORAS_INICIAIS, r.tarifas);
+
+  assert.equal(
+    resolverTarifaRota(
+      { ...rotaBase, equipamentoId: "truck_reboque" },
+      "truck_reboque",
+      r.tarifas,
+      transportadoras,
+    )?.tarifa,
+    undefined,
+  );
 });
 
 test("resolve tarifa da Via por unidade, CNPJ, equipamento e vigência", () => {

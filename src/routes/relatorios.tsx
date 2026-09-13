@@ -8,6 +8,7 @@ import { simularRota } from "@/lib/calculations/simulation";
 import { formatarHoras } from "@/lib/calculations/routeJourney";
 import { densidadeFmt, km as fmtKm, litros, reais, reaisLitro, variacao } from "@/lib/format";
 import { chaveRota } from "@/lib/data/identity";
+import { linhaCsv } from "@/lib/data/csv";
 
 export const Route = createFileRoute("/relatorios")({
   head: () => ({
@@ -81,7 +82,7 @@ function Relatorios() {
       "situacao",
     ];
     const linhasCsv = linhas.map((l) =>
-      [
+      linhaCsv([
         l.rota.codigo,
         l.rota.sufixoTipo,
         l.rota.regiao,
@@ -96,9 +97,9 @@ function Relatorios() {
         (l.ind.ocupacao * 100).toFixed(1),
         l.jornada.horas.toFixed(2),
         l.status,
-      ].join(";"),
+      ]),
     );
-    const blob = new Blob(["\ufeff" + [cab.join(";"), ...linhasCsv].join("\n")], {
+    const blob = new Blob(["\ufeff" + [linhaCsv(cab), ...linhasCsv].join("\n")], {
       type: "text/csv;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
