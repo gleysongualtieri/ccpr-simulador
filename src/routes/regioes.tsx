@@ -2,8 +2,8 @@ import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader, SectionTitle } from "@/components/ui-ccpr/PageHeader";
 import { Kpi, KpiGrid, Tag } from "@/components/ui-ccpr/Kpi";
-import { useLinhasRota } from "@/lib/data/selectors";
-import { agregarRotas, agruparPorRegiao } from "@/lib/calculations/regionalAggregation";
+import { agregarLinhas, useLinhasRota } from "@/lib/data/selectors";
+import { agruparPorRegiao } from "@/lib/calculations/regionalAggregation";
 import { densidadeFmt, km as fmtKm, litros, reais, reaisLitro } from "@/lib/format";
 import { chaveRota, identificadorRotaUrl } from "@/lib/data/identity";
 
@@ -32,9 +32,9 @@ function Regioes() {
   const regioes = useMemo(() => {
     const grupos = agruparPorRegiao(linhas.map((l) => l.rota));
     return [...grupos.entries()]
-      .map(([regiao, rotas]) => ({
+      .map(([regiao]) => ({
         regiao,
-        agregado: agregarRotas(rotas),
+        agregado: agregarLinhas(linhas.filter((l) => l.rota.regiao === regiao)),
         linhas: linhas
           .filter((l) => l.rota.regiao === regiao)
           .sort((a, b) => b.ind.custoLitro - a.ind.custoLitro),
@@ -42,7 +42,7 @@ function Regioes() {
       .sort((a, b) => b.agregado.custoLitro - a.agregado.custoLitro);
   }, [linhas]);
 
-  const total = agregarRotas(linhas.map((l) => l.rota));
+  const total = agregarLinhas(linhas);
   const pior = regioes[0];
 
   return (
@@ -55,10 +55,12 @@ function Regioes() {
       <KpiGrid>
         <Kpi rotulo="Regiões" valor={String(regioes.length)} />
         <Kpi rotulo="Volume total" valor={litros(total.volumeL)} />
-        <Kpi rotulo="Custo total" valor={reais(total.custo)} />
+        <Kpi rotulo="Custo total" valor={total.tarifasAusentes ? "—" : reais(total.custo)} />
         <Kpi
           rotulo="Pior R$/L regional"
-          valor={pior ? reaisLitro(pior.agregado.custoLitro) : "—"}
+          valor={
+            pior && !pior.agregado.tarifasAusentes ? reaisLitro(pior.agregado.custoLitro) : "—"
+          }
           detalhe={pior ? `Região ${pior.regiao}` : ""}
           tom="critico"
         />
@@ -80,11 +82,15 @@ function Regioes() {
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Custo</div>
-                  <div className="tabular">{reais(r.agregado.custo)}</div>
+                  <div className="tabular">
+                    {r.agregado.tarifasAusentes ? "—" : reais(r.agregado.custo)}
+                  </div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">R$/L</div>
-                  <div className="tabular text-primary">{reaisLitro(r.agregado.custoLitro)}</div>
+                  <div className="tabular text-primary">
+                    {r.agregado.tarifasAusentes ? "—" : reaisLitro(r.agregado.custoLitro)}
+                  </div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Densidade</div>
@@ -131,7 +137,7 @@ function Regioes() {
                       </td>
                       <td className="px-3 py-3 text-right text-sm tabular">{fmtKm(l.ind.km)}</td>
                       <td className="px-3 py-3 text-right text-sm tabular">
-                        {reaisLitro(l.ind.custoLitro)}
+                        {l.tarifaEncontrada ? reaisLitro(l.ind.custoLitro) : "Sem tarifa"}
                       </td>
                       <td className="py-3 pl-3 pr-4 text-right">
                         <Link

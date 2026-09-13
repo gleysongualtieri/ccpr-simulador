@@ -84,8 +84,12 @@ function DetalheRota() {
       <KpiGrid>
         <Kpi rotulo="Volume" valor={litros(ind.volumeL)} />
         <Kpi rotulo="Km" valor={fmtKm(ind.km)} />
-        <Kpi rotulo="Custo" valor={reais(ind.custo)} />
-        <Kpi rotulo="R$/L" valor={reaisLitro(ind.custoLitro)} tom="primario" />
+        <Kpi rotulo="Custo" valor={linha.tarifaEncontrada ? reais(ind.custo) : "—"} />
+        <Kpi
+          rotulo="R$/L"
+          valor={linha.tarifaEncontrada ? reaisLitro(ind.custoLitro) : "Sem tarifa"}
+          tom={linha.tarifaEncontrada ? "primario" : "critico"}
+        />
         <Kpi rotulo="Densidade" valor={densidadeFmt(ind.densidade)} />
         <Kpi
           rotulo="Ocupação"
@@ -183,6 +187,14 @@ function DetalheRota() {
               <div>
                 <dt className="text-muted-foreground">Transportadora</dt>
                 <dd className="mt-1">{rota.transportadora || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Tarifa aplicada</dt>
+                <dd className="mt-1">
+                  {linha.tarifa
+                    ? `${linha.tarifa.codigoTarifa} · início ${new Date(`${linha.tarifa.inicioVigencia}T00:00:00`).toLocaleDateString("pt-BR")}`
+                    : "Tarifa oficial não encontrada"}
+                </dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Código do veículo</dt>

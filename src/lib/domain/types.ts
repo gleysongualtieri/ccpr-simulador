@@ -22,6 +22,37 @@ export interface Equipamento {
   siglas: string[];
 }
 
+export interface Transportadora {
+  /** Sigla presente no código do veículo do Axiodis (ex.: VIA, TFL). */
+  sigla: string;
+  nome: string;
+  /** Uma transportadora pode operar por mais de uma filial/CNPJ. */
+  cnpjs: string[];
+  ativa: boolean;
+}
+
+export interface TarifaTransporte {
+  id: string;
+  unidadeId: string;
+  localNome: string;
+  cnpj: string;
+  transportadoraNome: string;
+  codigoTarifa: string;
+  tipoOrigem: string;
+  /** Ausente para adicionais ou tipos ainda sem equivalência operacional confirmada. */
+  equipamentoId?: string | undefined;
+  inicioVigencia: string;
+  fimVigencia?: string | undefined;
+  diaria?: number | undefined;
+  custoKm?: number | undefined;
+  valorKmInicio?: number | undefined;
+  valorKmFim?: number | undefined;
+  adicionalNoturno?: number | undefined;
+  motoristaExtra?: number | undefined;
+  atualizadaEm: string;
+  origemArquivo: string;
+}
+
 export interface Produtor {
   /** Código completo: Cooperativa + Linha + Matrícula (ex.: 205501587) */
   codigo: string;

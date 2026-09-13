@@ -2,9 +2,8 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader } from "@/components/ui-ccpr/PageHeader";
 import { Kpi, KpiGrid, Tag } from "@/components/ui-ccpr/Kpi";
-import { useLinhasRota } from "@/lib/data/selectors";
+import { agregarLinhas, useLinhasRota } from "@/lib/data/selectors";
 import { useDados } from "@/lib/data/store";
-import { agregarRotas } from "@/lib/calculations/regionalAggregation";
 import { DESCRICAO_SUFIXO } from "@/lib/calculations/compatibility";
 import { densidadeFmt, km as fmtKm, litros, percentual, reaisLitro } from "@/lib/format";
 import { formatarHoras } from "@/lib/calculations/routeJourney";
@@ -44,7 +43,7 @@ function Roteirizacao() {
     [linhas, sufixo],
   );
 
-  const total = agregarRotas(filtradas.map((l) => l.rota));
+  const total = agregarLinhas(filtradas);
   const produtoresVinculados = produtores.filter((p) =>
     filtradas.some((l) => l.rota.codigo === p.rotaCodigo),
   ).length;
@@ -123,7 +122,7 @@ function Roteirizacao() {
                   {percentual(l.ind.ocupacao)}
                 </td>
                 <td className="px-3 py-3 text-right text-sm tabular">
-                  {reaisLitro(l.ind.custoLitro)}
+                  {l.tarifaEncontrada ? reaisLitro(l.ind.custoLitro) : "Sem tarifa"}
                 </td>
                 <td className="py-3 pl-3 pr-4 text-right text-sm tabular">
                   {formatarHoras(l.jornada.horas)}

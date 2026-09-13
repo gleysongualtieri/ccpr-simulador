@@ -143,9 +143,11 @@ function Ranking() {
                 <td className="px-3 py-3 text-sm">{l.equipamento.nome}</td>
                 <td className="px-3 py-3 text-right text-sm tabular">{litros(l.ind.volumeL)}</td>
                 <td className="px-3 py-3 text-right text-sm tabular">{fmtKm(l.ind.km)}</td>
-                <td className="px-3 py-3 text-right text-sm tabular">{reais(l.ind.custo)}</td>
+                <td className="px-3 py-3 text-right text-sm tabular">
+                  {l.tarifaEncontrada ? reais(l.ind.custo) : "—"}
+                </td>
                 <td className="px-3 py-3 text-right text-sm tabular text-foreground">
-                  {reaisLitro(l.ind.custoLitro)}
+                  {l.tarifaEncontrada ? reaisLitro(l.ind.custoLitro) : "Sem tarifa"}
                 </td>
                 <td className="px-3 py-3 text-right text-sm tabular">
                   {densidadeFmt(l.ind.densidade)}

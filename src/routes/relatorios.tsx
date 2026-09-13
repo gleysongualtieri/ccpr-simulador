@@ -2,9 +2,8 @@ import { useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, SectionTitle } from "@/components/ui-ccpr/PageHeader";
 import { Kpi, KpiGrid, Tag } from "@/components/ui-ccpr/Kpi";
-import { useLinhasRota } from "@/lib/data/selectors";
+import { agregarLinhas, useLinhasRota } from "@/lib/data/selectors";
 import { useDados } from "@/lib/data/store";
-import { agregarRotas } from "@/lib/calculations/regionalAggregation";
 import { simularRota } from "@/lib/calculations/simulation";
 import { formatarHoras } from "@/lib/calculations/routeJourney";
 import { densidadeFmt, km as fmtKm, litros, reais, reaisLitro, variacao } from "@/lib/format";
@@ -31,10 +30,10 @@ export const Route = createFileRoute("/relatorios")({
 
 function Relatorios() {
   const linhas = useLinhasRota();
-  const { simulacoes, unidades, unidadeAtivaId } = useDados();
+  const { simulacoes, unidades, unidadeAtivaId, tarifas, transportadoras } = useDados();
   const unidade = unidades.find((u) => u.id === unidadeAtivaId);
 
-  const total = agregarRotas(linhas.map((l) => l.rota));
+  const total = agregarLinhas(linhas);
   const criticas = linhas.filter((l) => l.status === "critico");
 
   const aplicadas = useMemo(() => {
@@ -45,14 +44,19 @@ function Relatorios() {
           (l) => l.rota.codigo === s.rotaCodigo && (!s.rotaCiclo || l.rota.ciclo === s.rotaCiclo),
         );
         if (!linha) return [];
-        const r = simularRota(linha.rota, {
-          aumentoVolumeL: s.aumentoVolumeL,
-          aumentoKm: s.aumentoKm,
-          equipamentoIdSimulado: s.equipamentoIdSimulado,
-        });
+        const r = simularRota(
+          linha.rota,
+          {
+            aumentoVolumeL: s.aumentoVolumeL,
+            aumentoKm: s.aumentoKm,
+            equipamentoIdSimulado: s.equipamentoIdSimulado,
+          },
+          tarifas,
+          transportadoras,
+        );
         return r ? [{ s, r }] : [];
       });
-  }, [simulacoes, linhas]);
+  }, [simulacoes, linhas, tarifas, transportadoras]);
 
   const ganhoCustoLitro = aplicadas.length
     ? aplicadas.reduce((acc, a) => acc + (a.r.simulado.custoLitro - a.r.atual.custoLitro), 0) /
@@ -86,8 +90,8 @@ function Relatorios() {
         l.equipamento.nome,
         Math.round(l.ind.volumeL),
         l.ind.km,
-        l.ind.custo.toFixed(2),
-        l.ind.custoLitro.toFixed(4),
+        l.tarifaEncontrada ? l.ind.custo.toFixed(2) : "",
+        l.tarifaEncontrada ? l.ind.custoLitro.toFixed(4) : "",
         l.ind.densidade.toFixed(2),
         (l.ind.ocupacao * 100).toFixed(1),
         l.jornada.horas.toFixed(2),
@@ -125,8 +129,12 @@ function Relatorios() {
         <Kpi rotulo="Rotas" valor={String(total.rotas)} />
         <Kpi rotulo="Volume" valor={litros(total.volumeL)} />
         <Kpi rotulo="Km" valor={fmtKm(total.km)} />
-        <Kpi rotulo="Custo" valor={reais(total.custo)} />
-        <Kpi rotulo="R$/L da unidade" valor={reaisLitro(total.custoLitro)} tom="primario" />
+        <Kpi rotulo="Custo" valor={total.tarifasAusentes ? "—" : reais(total.custo)} />
+        <Kpi
+          rotulo="R$/L da unidade"
+          valor={total.tarifasAusentes ? "—" : reaisLitro(total.custoLitro)}
+          tom="primario"
+        />
         <Kpi rotulo="Densidade" valor={densidadeFmt(total.densidade)} />
         <Kpi
           rotulo="Rotas críticas"
@@ -216,13 +224,14 @@ function Relatorios() {
                       {l.jornada.critica ? <Tag tom="critico">Jornada &gt; 13h</Tag> : null}
                       {l.ind.ocupacao > 1 ? <Tag tom="critico">Capacidade excedida</Tag> : null}
                       {!l.compativel ? <Tag tom="critico">Equipamento incompatível</Tag> : null}
+                      {!l.tarifaEncontrada ? <Tag tom="critico">Tarifa oficial ausente</Tag> : null}
                     </div>
                   </td>
                   <td className="px-3 py-3 text-right text-sm tabular">
                     {formatarHoras(l.jornada.horas)}
                   </td>
                   <td className="py-3 pl-3 pr-4 text-right text-sm tabular">
-                    {reaisLitro(l.ind.custoLitro)}
+                    {l.tarifaEncontrada ? reaisLitro(l.ind.custoLitro) : "—"}
                   </td>
                 </tr>
               ))}

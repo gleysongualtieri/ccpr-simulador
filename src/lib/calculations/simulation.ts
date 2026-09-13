@@ -1,9 +1,14 @@
-import type { Equipamento, RotaOperacional } from "@/lib/domain/types";
-import { getEquipamento } from "./equipment";
+import type {
+  Equipamento,
+  RotaOperacional,
+  TarifaTransporte,
+  Transportadora,
+} from "@/lib/domain/types";
 import { isCompativel } from "./compatibility";
 import { indicadoresRota, type IndicadoresRota } from "./routeCost";
 import { validarCapacidade, type ResultadoCapacidade } from "./capacity";
 import { compararIndicadores, type Comparacao } from "./comparison";
+import { resolverTarifaRota } from "../data/tariffs";
 
 /**
  * Motor de simulação (PRD 6.1/6.2, RF03/RF04/RF05).
@@ -25,15 +30,26 @@ export interface ResultadoSimulacao {
   comparacao: Comparacao;
   capacidade: ResultadoCapacidade;
   compativel: boolean;
+  tarifaAtualEncontrada: boolean;
+  tarifaSimuladaEncontrada: boolean;
 }
 
 export function simularRota(
   rota: RotaOperacional,
   entrada: EntradaSimulacao,
+  tarifas: TarifaTransporte[] = [],
+  transportadoras: Transportadora[] = [],
 ): ResultadoSimulacao | null {
-  const equipamentoAtual = getEquipamento(rota.equipamentoId);
-  const equipamentoSimulado = getEquipamento(entrada.equipamentoIdSimulado);
-  if (!equipamentoAtual || !equipamentoSimulado) return null;
+  const atualResolvida = resolverTarifaRota(rota, rota.equipamentoId, tarifas, transportadoras);
+  const simuladaResolvida = resolverTarifaRota(
+    rota,
+    entrada.equipamentoIdSimulado,
+    tarifas,
+    transportadoras,
+  );
+  if (!atualResolvida || !simuladaResolvida) return null;
+  const equipamentoAtual = atualResolvida.equipamento;
+  const equipamentoSimulado = simuladaResolvida.equipamento;
 
   const atual = indicadoresRota(equipamentoAtual, rota.volumeL, rota.km, rota.capacidadeRealL);
 
@@ -53,6 +69,8 @@ export function simularRota(
     comparacao: compararIndicadores(atual, simulado),
     capacidade: validarCapacidade(equipamentoSimulado, novoVolume, capacidadeSimuladaL),
     compativel: isCompativel(rota.sufixoTipo, equipamentoSimulado.id),
+    tarifaAtualEncontrada: rota.origem.mock || Boolean(atualResolvida.tarifa),
+    tarifaSimuladaEncontrada: rota.origem.mock || Boolean(simuladaResolvida.tarifa),
   };
 }
 

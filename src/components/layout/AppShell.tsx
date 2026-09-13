@@ -12,6 +12,7 @@ import {
   ListOrdered,
   SlidersHorizontal,
   Layers,
+  BadgeDollarSign,
 } from "lucide-react";
 import { useDados } from "@/lib/data/store";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ const NAV = [
   { to: "/simulador", label: "Simulador", icon: SlidersHorizontal },
   { to: "/importacao", label: "Importação de Dados", icon: Upload },
   { to: "/equipamentos", label: "Equipamentos", icon: Truck },
+  { to: "/tarifas", label: "Tarifas e Transportadoras", icon: BadgeDollarSign },
   { to: "/relatorios", label: "Relatórios", icon: FileBarChart },
 ] as const;
 
@@ -96,7 +98,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                     : "border-transparent text-foreground hover:bg-surface",
                 )}
               >
-                <Icone className={cn("h-4.5 w-4.5 shrink-0", ativo ? "text-primary" : "text-muted-foreground")} />
+                <Icone
+                  className={cn(
+                    "h-4.5 w-4.5 shrink-0",
+                    ativo ? "text-primary" : "text-muted-foreground",
+                  )}
+                />
                 <span className="flex-1">{item.label}</span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground/60" />
               </Link>
@@ -113,7 +120,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         ) : null}
       </aside>
 
-      <main className={cn("pt-16 transition-[padding] duration-200", menuAberto ? "pl-64" : "pl-0")}>
+      <main
+        className={cn("pt-16 transition-[padding] duration-200", menuAberto ? "pl-64" : "pl-0")}
+      >
         <div className="mx-auto max-w-[1440px] px-8 py-8">{children}</div>
       </main>
     </div>

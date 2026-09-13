@@ -34,7 +34,7 @@ export const Route = createFileRoute("/simulador/$codigo")({
 function SimuladorRota() {
   const { codigo } = Route.useParams();
   const rotas = useRotasUnidade();
-  const { registrarSimulacao } = useDados();
+  const { registrarSimulacao, tarifas, transportadoras } = useDados();
   const rota = encontrarRotaPorIdentificador(rotas, codigo);
 
   const [aumentoVolumeL, setAumentoVolumeL] = useState(0);
@@ -47,13 +47,18 @@ function SimuladorRota() {
   const resultado = useMemo(
     () =>
       rota
-        ? simularRota(rota, {
-            aumentoVolumeL,
-            aumentoKm,
-            equipamentoIdSimulado: equipamentoIdSimulado || rota.equipamentoId,
-          })
+        ? simularRota(
+            rota,
+            {
+              aumentoVolumeL,
+              aumentoKm,
+              equipamentoIdSimulado: equipamentoIdSimulado || rota.equipamentoId,
+            },
+            tarifas,
+            transportadoras,
+          )
         : null,
-    [rota, aumentoVolumeL, aumentoKm, equipamentoIdSimulado],
+    [rota, aumentoVolumeL, aumentoKm, equipamentoIdSimulado, tarifas, transportadoras],
   );
 
   if (!rota || !resultado) {
@@ -75,7 +80,11 @@ function SimuladorRota() {
     aumentoVolumeL === 0 &&
     aumentoKm === 0 &&
     resultado.equipamentoSimulado.id === rota.equipamentoId;
-  const bloqueada = !resultado.compativel || resultado.capacidade.excedida;
+  const bloqueada =
+    !resultado.compativel ||
+    resultado.capacidade.excedida ||
+    !resultado.tarifaAtualEncontrada ||
+    !resultado.tarifaSimuladaEncontrada;
 
   return (
     <>
@@ -205,7 +214,8 @@ function SimuladorRota() {
             ) : null}
             {bloqueada ? (
               <p className="text-sm text-destructive">
-                Corrija a incompatibilidade ou o excesso de capacidade antes de registrar.
+                Corrija a incompatibilidade, o excesso de capacidade ou a tarifa ausente antes de
+                registrar.
               </p>
             ) : null}
           </div>
@@ -235,8 +245,16 @@ function SimuladorRota() {
             <KpiGrid>
               <Kpi
                 rotulo="R$/L simulado"
-                valor={reaisLitro(resultado.simulado.custoLitro)}
-                detalhe={`Atual ${reaisLitro(resultado.atual.custoLitro)}`}
+                valor={
+                  resultado.tarifaSimuladaEncontrada
+                    ? reaisLitro(resultado.simulado.custoLitro)
+                    : "Sem tarifa"
+                }
+                detalhe={
+                  resultado.tarifaAtualEncontrada
+                    ? `Atual ${reaisLitro(resultado.atual.custoLitro)}`
+                    : "A tarifa atual também está ausente"
+                }
                 tom={resultado.comparacao.custoLitro.favoravel ? "primario" : "critico"}
               />
               <Kpi rotulo="Volume simulado" valor={litros(resultado.simulado.volumeL)} />

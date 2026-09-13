@@ -55,7 +55,7 @@ function SimuladorIndex() {
             {ordenadas.map((l) => (
               <option key={chaveRota(l.rota)} value={identificadorRotaUrl(l.rota)}>
                 {l.rota.codigo} — {l.rota.ciclo === "par" ? "par" : "ímpar"} — região{" "}
-                {l.rota.regiao} — {reaisLitro(l.ind.custoLitro)}
+                {l.rota.regiao} — {l.tarifaEncontrada ? reaisLitro(l.ind.custoLitro) : "sem tarifa"}
               </option>
             ))}
           </select>
@@ -83,7 +83,7 @@ function SimuladorIndex() {
                 <td className="px-3 py-3 text-sm">{l.equipamento.nome}</td>
                 <td className="px-3 py-3 text-right text-sm tabular">{litros(l.ind.volumeL)}</td>
                 <td className="px-3 py-3 text-right text-sm tabular">
-                  {reaisLitro(l.ind.custoLitro)}
+                  {l.tarifaEncontrada ? reaisLitro(l.ind.custoLitro) : "Sem tarifa"}
                 </td>
                 <td className="py-3 pl-3 pr-4 text-right">
                   <Link

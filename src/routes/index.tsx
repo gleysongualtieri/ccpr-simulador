@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader, SectionTitle } from "@/components/ui-ccpr/PageHeader";
 import { Kpi, KpiGrid, Tag } from "@/components/ui-ccpr/Kpi";
-import { useLinhasRota } from "@/lib/data/selectors";
+import { agregarLinhas, useLinhasRota } from "@/lib/data/selectors";
 import { useDados } from "@/lib/data/store";
-import { agregarRotas, agruparPorRegiao } from "@/lib/calculations/regionalAggregation";
+import { agruparPorRegiao } from "@/lib/calculations/regionalAggregation";
 import { densidadeFmt, km as fmtKm, litros, reais, reaisLitro } from "@/lib/format";
 import { formatarHoras } from "@/lib/calculations/routeJourney";
 import { chaveRota, identificadorRotaUrl } from "@/lib/data/identity";
@@ -33,13 +33,16 @@ function VisaoGeral() {
   const { unidades, unidadeAtivaId, temDadosMock } = useDados();
   const unidade = unidades.find((u) => u.id === unidadeAtivaId);
 
-  const total = agregarRotas(linhas.map((l) => l.rota));
+  const total = agregarLinhas(linhas);
   const criticas = linhas.filter((l) => l.status === "critico");
   const jornadasCriticas = linhas.filter((l) => l.jornada.critica);
   const maisCaras = [...linhas].sort((a, b) => b.ind.custoLitro - a.ind.custoLitro).slice(0, 5);
 
   const regioes = [...agruparPorRegiao(linhas.map((l) => l.rota)).entries()]
-    .map(([regiao, rotas]) => ({ regiao, ...agregarRotas(rotas) }))
+    .map(([regiao]) => ({
+      regiao,
+      ...agregarLinhas(linhas.filter((l) => l.rota.regiao === regiao)),
+    }))
     .sort((a, b) => b.custoLitro - a.custoLitro);
 
   return (
@@ -60,8 +63,19 @@ function VisaoGeral() {
         <Kpi rotulo="Rotas analisadas" valor={String(total.rotas)} tom="primario" />
         <Kpi rotulo="Volume total" valor={litros(total.volumeL)} />
         <Kpi rotulo="Km total" valor={fmtKm(total.km)} />
-        <Kpi rotulo="Custo total" valor={reais(total.custo)} />
-        <Kpi rotulo="R$/L" valor={reaisLitro(total.custoLitro)} tom="primario" />
+        <Kpi
+          rotulo="Custo total"
+          valor={total.tarifasAusentes ? "—" : reais(total.custo)}
+          {...(total.tarifasAusentes
+            ? { detalhe: `${total.tarifasAusentes} rota(s) sem tarifa oficial` }
+            : {})}
+          tom={total.tarifasAusentes ? "critico" : "neutro"}
+        />
+        <Kpi
+          rotulo="R$/L"
+          valor={total.tarifasAusentes ? "—" : reaisLitro(total.custoLitro)}
+          tom="primario"
+        />
         <Kpi rotulo="Densidade" valor={densidadeFmt(total.densidade)} />
         <Kpi
           rotulo="Rotas críticas"
@@ -101,7 +115,7 @@ function VisaoGeral() {
                       {litros(l.ind.volumeL)}
                     </td>
                     <td className="px-3 py-3 text-right text-sm tabular text-foreground">
-                      {reaisLitro(l.ind.custoLitro)}
+                      {l.tarifaEncontrada ? reaisLitro(l.ind.custoLitro) : "Sem tarifa"}
                     </td>
                     <td className="px-3 py-3 text-right text-sm tabular">
                       {l.jornada.critica ? (
@@ -156,7 +170,7 @@ function VisaoGeral() {
                       {densidadeFmt(r.densidade)}
                     </td>
                     <td className="py-3 pl-3 pr-4 text-right text-sm tabular text-foreground">
-                      {reaisLitro(r.custoLitro)}
+                      {r.tarifasAusentes ? "—" : reaisLitro(r.custoLitro)}
                     </td>
                   </tr>
                 ))}

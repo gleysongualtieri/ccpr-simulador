@@ -3,7 +3,7 @@ import { PageHeader, SectionTitle } from "@/components/ui-ccpr/PageHeader";
 import { Tag } from "@/components/ui-ccpr/Kpi";
 import { EQUIPAMENTOS } from "@/lib/calculations/equipment";
 import { DESCRICAO_SUFIXO, SUFIXOS_VALIDOS, isCompativel } from "@/lib/calculations/compatibility";
-import { litros, reais } from "@/lib/format";
+import { litros } from "@/lib/format";
 
 export const Route = createFileRoute("/equipamentos")({
   head: () => ({
@@ -29,7 +29,7 @@ function Equipamentos() {
     <>
       <PageHeader
         titulo="Equipamentos"
-        descricao="Fonte única de capacidade e custo usada por todas as simulações. Os valores de diária e R$/km são parametrizáveis e devem ser substituídos pela Tabela de Tarifas oficial quando disponível."
+        descricao="A capacidade real é lida do código do veículo do Axiodis. Nas rotas R, o simulador soma a capacidade informada do reboque. Diária e R$/km são obtidos pela tabela oficial importada."
       />
 
       <SectionTitle hint="capacidade e custo">Tabela de referência</SectionTitle>
@@ -41,8 +41,7 @@ function Equipamentos() {
               <th className="px-3 py-3 text-left">Tipo</th>
               <th className="px-3 py-3 text-left">Siglas Axiodis</th>
               <th className="px-3 py-3 text-right">Capacidade</th>
-              <th className="px-3 py-3 text-right">Diária</th>
-              <th className="py-3 pl-3 pr-4 text-right">R$/km</th>
+              <th className="py-3 pl-3 pr-4 text-left">Tarifa</th>
             </tr>
           </thead>
           <tbody>
@@ -52,8 +51,9 @@ function Equipamentos() {
                 <td className="px-3 py-3 text-sm capitalize text-muted-foreground">{e.tipo}</td>
                 <td className="px-3 py-3 text-sm">{e.siglas.join(", ")}</td>
                 <td className="px-3 py-3 text-right text-sm tabular">{litros(e.capacidadeL)}</td>
-                <td className="px-3 py-3 text-right text-sm tabular">{reais(e.diaria)}</td>
-                <td className="py-3 pl-3 pr-4 text-right text-sm tabular">{reais(e.custoKm)}</td>
+                <td className="py-3 pl-3 pr-4 text-sm text-muted-foreground">
+                  Por unidade, transportadora e vigência
+                </td>
               </tr>
             ))}
           </tbody>
@@ -81,9 +81,7 @@ function Equipamentos() {
               {SUFIXOS_VALIDOS.map((s) => (
                 <tr key={s} className="border-t border-border">
                   <td className="py-3 pl-4 pr-3 text-sm font-medium">{s}</td>
-                  <td className="px-3 py-3 text-sm text-muted-foreground">
-                    {DESCRICAO_SUFIXO[s]}
-                  </td>
+                  <td className="px-3 py-3 text-sm text-muted-foreground">{DESCRICAO_SUFIXO[s]}</td>
                   {EQUIPAMENTOS.map((e) => (
                     <td key={e.id} className="px-2 py-3 text-center">
                       {isCompativel(s, e.id) ? <Tag tom="primario">Sim</Tag> : <Tag>—</Tag>}

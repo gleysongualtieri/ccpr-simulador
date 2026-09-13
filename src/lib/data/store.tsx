@@ -7,9 +7,17 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Produtor, RotaOperacional, SimulacaoRapida, Unidade } from "@/lib/domain/types";
+import type {
+  Produtor,
+  RotaOperacional,
+  SimulacaoRapida,
+  TarifaTransporte,
+  Transportadora,
+  Unidade,
+} from "@/lib/domain/types";
 import { PRODUTORES_MOCK, ROTAS_MOCK, UNIDADES } from "./seed";
 import { chaveProdutorRota, chaveRota } from "./identity";
+import { associarTransportadorasImportadas, TRANSPORTADORAS_INICIAIS } from "./tariffs";
 
 /**
  * Repositório de dados da aplicação.
@@ -24,6 +32,8 @@ interface Estado {
   rotas: RotaOperacional[];
   produtores: Produtor[];
   simulacoes: SimulacaoRapida[];
+  tarifas: TarifaTransporte[];
+  transportadoras: Transportadora[];
   unidadeAtivaId: string;
 }
 
@@ -37,6 +47,8 @@ interface RepositorioDados extends Estado {
   registrarSimulacao: (s: Omit<SimulacaoRapida, "id" | "criadaEm">) => void;
   marcarAplicada: (id: string, aplicado: boolean) => void;
   removerSimulacao: (id: string) => void;
+  substituirTarifas: (tarifas: TarifaTransporte[]) => void;
+  salvarTransportadora: (transportadora: Transportadora) => void;
 }
 
 const estadoInicial: Estado = {
@@ -44,6 +56,8 @@ const estadoInicial: Estado = {
   rotas: ROTAS_MOCK,
   produtores: PRODUTORES_MOCK,
   simulacoes: [],
+  tarifas: [],
+  transportadoras: TRANSPORTADORAS_INICIAIS,
   unidadeAtivaId: UNIDADES[0]!.id,
 };
 
@@ -151,6 +165,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
         })),
       removerSimulacao: (id) =>
         setEstado((p) => ({ ...p, simulacoes: p.simulacoes.filter((s) => s.id !== id) })),
+      substituirTarifas: (tarifas) =>
+        setEstado((p) => ({
+          ...p,
+          tarifas,
+          transportadoras: associarTransportadorasImportadas(p.transportadoras, tarifas),
+        })),
+      salvarTransportadora: (transportadora) =>
+        setEstado((p) => ({
+          ...p,
+          transportadoras: [
+            ...p.transportadoras.filter((item) => item.sigla !== transportadora.sigla),
+            transportadora,
+          ].sort((a, b) => a.sigla.localeCompare(b.sigla)),
+        })),
     }),
     [estado, hidratado, substituirBase, mesclarBase],
   );
