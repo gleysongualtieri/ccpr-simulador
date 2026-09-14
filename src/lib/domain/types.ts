@@ -110,6 +110,8 @@ export interface RotaOperacional {
   capacidadeRealL?: number | undefined;
   /** Capacidade nominal do cavalo (sem reboque) */
   capacidadeNominalL?: number | undefined;
+  /** Capacidade do veículo sem reboque, confirmada pelo operador. */
+  capacidadeVeiculoInformadaL?: number | undefined;
   /** Capacidade do reboque escolhida para esta execução de rota R. */
   capacidadeReboqueL?: number | undefined;
 }

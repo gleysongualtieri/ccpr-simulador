@@ -18,6 +18,7 @@ import {
   getEquipamento,
 } from "@/lib/calculations/equipment";
 import { litros } from "@/lib/format";
+import { recalcularCapacidadeRota } from "@/lib/data/routeCapacity";
 
 export const Route = createFileRoute("/importacao")({
   head: () => ({
@@ -152,18 +153,31 @@ function Importacao() {
       if (!atual) return atual;
       const rotas = atual.rotas.map((rota, indice) => {
         if (indice !== indiceRota) return rota;
-        const capacidadeNominalL = rota.capacidadeNominalL ?? 0;
-        return {
+        return recalcularCapacidadeRota({
           ...rota,
           capacidadeReboqueL,
-          capacidadeRealL:
-            capacidadeReboqueL && capacidadeNominalL > 0
-              ? capacidadeNominalL + capacidadeReboqueL
-              : undefined,
-        };
+        });
       });
       return { ...atual, rotas };
     });
+  }
+
+  function informarCapacidadeVeiculo(indiceRota: number, valor: string) {
+    setPrevia((atual) =>
+      atual
+        ? {
+            ...atual,
+            rotas: atual.rotas.map((rota, indice) =>
+              indice !== indiceRota
+                ? rota
+                : recalcularCapacidadeRota({
+                    ...rota,
+                    capacidadeVeiculoInformadaL: valor === "" ? undefined : Number(valor),
+                  }),
+            ),
+          }
+        : atual,
+    );
   }
 
   return (
@@ -307,7 +321,12 @@ function Importacao() {
             <SectionTitle hint="revise todas as rotas antes de confirmar">
               Rotas a importar
             </SectionTitle>
-            <div className="overflow-hidden rounded-md border border-border bg-card">
+            <p className="mb-3 text-sm text-muted-foreground">
+              Informe a capacidade real do veículo sem reboque quando ela diferir do código Axiodis.
+              Deixe em branco para usar a capacidade do código. Informe o reboque separadamente; a
+              capacidade total será recalculada.
+            </p>
+            <div className="overflow-x-auto rounded-md border border-border bg-card">
               <table className="w-full">
                 <thead>
                   <tr className="bg-surface text-sm font-medium text-muted-foreground">
@@ -316,6 +335,7 @@ function Importacao() {
                     <th className="px-3 py-3 text-left">Região</th>
                     <th className="px-3 py-3 text-left">Ciclo</th>
                     <th className="px-3 py-3 text-left">Veículo</th>
+                    <th className="px-3 py-3 text-left">Veículo sem reboque (L)</th>
                     <th className="px-3 py-3 text-left">Reboque (L)</th>
                     <th className="px-3 py-3 text-right">Capacidade total</th>
                     <th className="py-3 pl-3 pr-4 text-right">Volume</th>
@@ -334,6 +354,22 @@ function Importacao() {
                         <td className="px-3 py-3 text-sm">{r.regiao}</td>
                         <td className="px-3 py-3 text-sm">{r.ciclo === "par" ? "Par" : "Ímpar"}</td>
                         <td className="px-3 py-3 text-sm text-muted-foreground">{r.veiculo}</td>
+                        <td className="px-3 py-3 text-sm">
+                          <input
+                            type="number"
+                            min={1}
+                            max={100000}
+                            step={1}
+                            value={r.capacidadeVeiculoInformadaL ?? ""}
+                            placeholder={String(r.capacidadeNominalL ?? "")}
+                            onChange={(e) => informarCapacidadeVeiculo(indice, e.target.value)}
+                            aria-label={`Capacidade real do veículo sem reboque da rota ${r.codigo}`}
+                            className="h-9 w-32 rounded-md border border-border bg-card px-2 text-right tabular"
+                          />
+                          <div className="text-xs text-muted-foreground">
+                            Código Axiodis: {litros(r.capacidadeNominalL ?? 0)}
+                          </div>
+                        </td>
                         <td className="px-3 py-3 text-sm">
                           {exigeReboque ? (
                             <input

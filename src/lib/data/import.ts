@@ -770,6 +770,19 @@ export function auditarBase(rotas: RotaOperacional[], produtores: Produtor[]): P
       });
     }
     const capacidadeRealL = rota.capacidadeRealL;
+    if (
+      rota.capacidadeVeiculoInformadaL !== undefined &&
+      (!Number.isFinite(rota.capacidadeVeiculoInformadaL) ||
+        rota.capacidadeVeiculoInformadaL <= 0 ||
+        rota.capacidadeVeiculoInformadaL > 100_000)
+    ) {
+      problemas.push({
+        severidade: "erro",
+        entidade: rota.codigo,
+        campo: "capacidade",
+        mensagem: "Informe uma capacidade válida do veículo sem reboque entre 1 e 100.000 L.",
+      });
+    }
     if (capacidadeRealL && rota.volumeL > capacidadeRealL) {
       problemas.push({
         severidade: "erro",

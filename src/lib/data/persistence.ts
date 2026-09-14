@@ -37,6 +37,7 @@ const rota = z.object({
   origem,
   capacidadeRealL: numero.optional(),
   capacidadeNominalL: numero.optional(),
+  capacidadeVeiculoInformadaL: numero.optional(),
   capacidadeReboqueL: numero.optional(),
 });
 const produtor = z.object({

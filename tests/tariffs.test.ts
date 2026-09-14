@@ -8,6 +8,48 @@ import {
   TRANSPORTADORAS_INICIAIS,
 } from "../src/lib/data/tariffs.ts";
 import type { RotaOperacional } from "../src/lib/domain/types.ts";
+import { recalcularCapacidadeRota } from "../src/lib/data/routeCapacity.ts";
+import { auditarBase } from "../src/lib/data/import.ts";
+import { lerEstadoPersistido } from "../src/lib/data/persistence.ts";
+
+test("Bitruck 18.500 + reboque 15.000 preserva origem, capacidade e tarifa comum", () => {
+  const rota = recalcularCapacidadeRota({
+    ...rotaBase,
+    equipamentoId: "bitruck_reboque",
+    capacidadeNominalL: 18000,
+    capacidadeVeiculoInformadaL: 18500,
+    capacidadeReboqueL: 15000,
+    volumeL: 33110,
+  });
+  assert.equal(rota.capacidadeRealL, 33500);
+  assert.equal(rota.capacidadeNominalL, 18000);
+  assert.ok(!auditarBase([rota], []).some((p) => p.campo === "capacidade"));
+  assert.ok(auditarBase([{ ...rota, volumeL: 33501 }], []).some((p) => p.campo === "capacidade"));
+  assert.equal(
+    lerEstadoPersistido(JSON.stringify({ rotas: [rota] }))?.rotas?.[0]?.capacidadeVeiculoInformadaL,
+    18500,
+  );
+  const tarifas = importarMatrizTarifas(
+    [CABECALHO, linha("BITRUCK_REBOQUE", "2026-06-01", 1677.47, 4.89, "2026-06-15 20:00:00")],
+    "tarifas.xlsx",
+  ).tarifas;
+  const carriers = associarTransportadorasImportadas(TRANSPORTADORAS_INICIAIS, tarifas);
+  const resolver = (r: RotaOperacional) =>
+    resolverTarifaRota(r, r.equipamentoId, tarifas, carriers);
+  assert.equal(resolver(rota)?.tarifa?.categoriaReboque, "comum");
+  assert.equal(
+    resolver(recalcularCapacidadeRota({ ...rota, capacidadeVeiculoInformadaL: 21000 }))?.tarifa?.id,
+    resolver(rota)?.tarifa?.id,
+  );
+  assert.equal(
+    recalcularCapacidadeRota({ ...rota, capacidadeReboqueL: undefined }).capacidadeRealL,
+    undefined,
+  );
+  assert.equal(
+    recalcularCapacidadeRota({ ...rota, capacidadeVeiculoInformadaL: undefined }).capacidadeRealL,
+    33000,
+  );
+});
 
 const CABECALHO = [
   "Local",
