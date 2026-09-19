@@ -53,6 +53,9 @@ const produtor = z.object({
   dataColeta: texto(64).optional(),
 });
 const simulacao = z.object({
+  capacidadeVeiculoSimuladaL: numero.optional(),
+  capacidadeReboqueSimuladaL: numero.optional(),
+  categoriaReboqueSimulada: z.enum(["comum", "trucado"]).optional(),
   id: texto(100),
   rotaCodigo: texto(50),
   rotaCiclo: z.enum(["par", "impar"]).optional(),

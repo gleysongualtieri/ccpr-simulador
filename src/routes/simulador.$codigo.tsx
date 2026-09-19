@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader, SectionTitle } from "@/components/ui-ccpr/PageHeader";
 import { Kpi, KpiGrid, Tag } from "@/components/ui-ccpr/Kpi";
 import { TabelaComparacao } from "@/components/ui-ccpr/Comparacao";
 import { useDados, useRotasUnidade } from "@/lib/data/store";
 import { simularRota } from "@/lib/calculations/simulation";
+import { categoriaReboquePorCapacidade } from "@/lib/data/tariffs";
 import { EQUIPAMENTOS } from "@/lib/calculations/equipment";
 import { DESCRICAO_SUFIXO, equipamentosCompativeis } from "@/lib/calculations/compatibility";
 import { litros, percentual, reaisLitro } from "@/lib/format";
@@ -40,7 +41,22 @@ function SimuladorRota() {
   const [aumentoVolumeL, setAumentoVolumeL] = useState(0);
   const [aumentoKm, setAumentoKm] = useState(0);
   const [equipamentoIdSimulado, setEquipamentoIdSimulado] = useState(rota?.equipamentoId ?? "");
+  const capacidadeOriginal = rota?.capacidadeVeiculoInformadaL ?? rota?.capacidadeNominalL ?? 0;
+  const [capacidadeVeiculoSimuladaL, setVeiculo] = useState(capacidadeOriginal);
+  const [capacidadeReboqueSimuladaL, setReboque] = useState(rota?.capacidadeReboqueL ?? 0);
+  const [categoriaReboqueSimulada, setCategoria] = useState<"comum" | "trucado" | undefined>();
+  const conjunto = EQUIPAMENTOS.find((e) => e.id === equipamentoIdSimulado)?.tipo === "reboque";
   const [salvo, setSalvo] = useState(false);
+
+  useEffect(() => {
+    setEquipamentoIdSimulado(rota?.equipamentoId ?? "");
+    setVeiculo(rota?.capacidadeVeiculoInformadaL ?? rota?.capacidadeNominalL ?? 0);
+    setReboque(rota?.capacidadeReboqueL ?? 0);
+    setCategoria(undefined);
+    setAumentoVolumeL(0);
+    setAumentoKm(0);
+    setSalvo(false);
+  }, [rota]);
 
   const compativeis = useMemo(() => (rota ? equipamentosCompativeis(rota.sufixoTipo) : []), [rota]);
 
@@ -50,6 +66,9 @@ function SimuladorRota() {
         ? simularRota(
             rota,
             {
+              capacidadeVeiculoSimuladaL,
+              capacidadeReboqueSimuladaL,
+              categoriaReboqueSimulada,
               aumentoVolumeL,
               aumentoKm,
               equipamentoIdSimulado: equipamentoIdSimulado || rota.equipamentoId,
@@ -58,7 +77,17 @@ function SimuladorRota() {
             transportadoras,
           )
         : null,
-    [rota, aumentoVolumeL, aumentoKm, equipamentoIdSimulado, tarifas, transportadoras],
+    [
+      rota,
+      aumentoVolumeL,
+      aumentoKm,
+      equipamentoIdSimulado,
+      tarifas,
+      transportadoras,
+      capacidadeVeiculoSimuladaL,
+      capacidadeReboqueSimuladaL,
+      categoriaReboqueSimulada,
+    ],
   );
 
   if (!rota || !resultado) {
@@ -79,12 +108,11 @@ function SimuladorRota() {
   const semAlteracao =
     aumentoVolumeL === 0 &&
     aumentoKm === 0 &&
-    resultado.equipamentoSimulado.id === rota.equipamentoId;
-  const bloqueada =
-    !resultado.compativel ||
-    resultado.capacidade.excedida ||
-    !resultado.tarifaAtualEncontrada ||
-    !resultado.tarifaSimuladaEncontrada;
+    resultado.equipamentoSimulado.id === rota.equipamentoId &&
+    capacidadeVeiculoSimuladaL === capacidadeOriginal &&
+    (!conjunto || capacidadeReboqueSimuladaL === rota.capacidadeReboqueL);
+
+  const bloqueada = !resultado.viavel;
 
   return (
     <>
@@ -148,6 +176,11 @@ function SimuladorRota() {
                 value={equipamentoIdSimulado || rota.equipamentoId}
                 onChange={(e) => {
                   setEquipamentoIdSimulado(e.target.value);
+                  setVeiculo(e.target.value === rota.equipamentoId ? capacidadeOriginal : 0);
+                  setReboque(
+                    e.target.value === rota.equipamentoId ? (rota.capacidadeReboqueL ?? 0) : 0,
+                  );
+                  setCategoria(undefined);
                   setSalvo(false);
                 }}
                 className="mt-2 h-11 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary"
@@ -155,14 +188,14 @@ function SimuladorRota() {
                 <optgroup label={`Compatíveis com sufixo ${rota.sufixoTipo}`}>
                   {compativeis.map((e) => (
                     <option key={e.id} value={e.id}>
-                      {e.nome} — {litros(e.capacidadeL)}
+                      {e.nome}
                     </option>
                   ))}
                 </optgroup>
                 <optgroup label="Demais equipamentos (incompatíveis)">
                   {EQUIPAMENTOS.filter((e) => !compativeis.some((c) => c.id === e.id)).map((e) => (
                     <option key={e.id} value={e.id}>
-                      {e.nome} — {litros(e.capacidadeL)}
+                      {e.nome}
                     </option>
                   ))}
                 </optgroup>
@@ -172,12 +205,96 @@ function SimuladorRota() {
               </span>
             </label>
 
+            <label className="block text-sm">
+              Capacidade real do veículo sem reboque (L)
+              <input
+                aria-label="Capacidade real do veículo"
+                type="number"
+                min={1}
+                max={100000}
+                step={1}
+                value={capacidadeVeiculoSimuladaL || ""}
+                onChange={(e) => {
+                  setVeiculo(Number(e.target.value));
+                  setSalvo(false);
+                }}
+                className="mt-2 h-11 w-full rounded-md border border-border bg-background px-3"
+              />
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Para Carreta, Vanderleia e Bitrem, informe a capacidade total do equipamento.
+              </span>
+            </label>
+            {conjunto && (
+              <>
+                <label className="block text-sm">
+                  Capacidade real do reboque (L)
+                  <input
+                    aria-label="Capacidade real do reboque"
+                    type="number"
+                    list="capacidades-reboque"
+                    min={1}
+                    max={100000}
+                    step={1}
+                    value={capacidadeReboqueSimuladaL || ""}
+                    onChange={(e) => {
+                      setReboque(Number(e.target.value));
+                      setCategoria(undefined);
+                      setSalvo(false);
+                    }}
+                    className="mt-2 h-11 w-full rounded-md border border-border bg-background px-3"
+                  />
+                  <datalist id="capacidades-reboque">
+                    {[12000, 15000, 18000, 21000].map((n) => (
+                      <option key={n} value={n} />
+                    ))}
+                  </datalist>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    Selecione uma sugestão ou informe outra capacidade.
+                  </span>
+                </label>
+                {categoriaReboquePorCapacidade(capacidadeReboqueSimuladaL) ? (
+                  <p className="text-sm">
+                    Reboque {categoriaReboquePorCapacidade(capacidadeReboqueSimuladaL)}.
+                  </p>
+                ) : (
+                  <label className="block text-sm">
+                    Categoria do reboque
+                    <select
+                      value={categoriaReboqueSimulada ?? ""}
+                      onChange={(e) => {
+                        setCategoria(
+                          e.target.value === "comum" || e.target.value === "trucado"
+                            ? e.target.value
+                            : undefined,
+                        );
+                        setSalvo(false);
+                      }}
+                      className="mt-2 h-11 w-full rounded-md border border-border bg-background px-3"
+                    >
+                      <option value="">Selecione a categoria</option>
+                      <option value="comum">Comum — 2 eixos</option>
+                      <option value="trucado">Trucado — 3 eixos</option>
+                    </select>
+                  </label>
+                )}
+              </>
+            )}
+            <p className="text-sm">
+              Capacidade total:{" "}
+              {resultado.simulado.capacidadeL > 0
+                ? litros(resultado.simulado.capacidadeL)
+                : "Informe as capacidades"}
+            </p>
             <div className="flex flex-wrap gap-3 border-t border-border pt-4">
               <button
                 type="button"
                 disabled={semAlteracao || bloqueada}
                 onClick={() => {
+                  if (bloqueada || semAlteracao) return;
                   registrarSimulacao({
+                    capacidadeVeiculoSimuladaL,
+                    capacidadeReboqueSimuladaL,
+                    categoriaReboqueSimulada,
                     rotaCodigo: rota.codigo,
                     rotaCiclo: rota.ciclo,
                     aumentoVolumeL,
@@ -197,6 +314,9 @@ function SimuladorRota() {
                   setAumentoVolumeL(0);
                   setAumentoKm(0);
                   setEquipamentoIdSimulado(rota.equipamentoId);
+                  setVeiculo(capacidadeOriginal);
+                  setReboque(rota.capacidadeReboqueL ?? 0);
+                  setCategoria(undefined);
                   setSalvo(false);
                 }}
                 className="inline-flex h-11 items-center rounded-md border border-border px-5 text-sm text-foreground transition-colors hover:bg-surface"
@@ -213,17 +333,37 @@ function SimuladorRota() {
               </p>
             ) : null}
             {bloqueada ? (
-              <p className="text-sm text-destructive">
-                Corrija a incompatibilidade, o excesso de capacidade ou a tarifa ausente antes de
-                registrar.
-              </p>
+              <p className="text-sm text-destructive">{resultado.motivosBloqueio.join(" ")}</p>
             ) : null}
           </div>
         </section>
 
         <section>
           <SectionTitle hint="cálculo em tempo real">Resultado</SectionTitle>
+          <p className="mb-4 text-sm text-muted-foreground">
+            A jornada verificada é a original, entre Saída e Balanza. Alterações de km não estimam
+            uma nova duração.
+          </p>
 
+          {bloqueada && (
+            <div
+              role="alert"
+              className="mb-4 rounded-md border border-destructive p-4 text-destructive"
+            >
+              <strong>Simulação inviável</strong>
+              <ul className="list-disc pl-5">
+                {resultado.motivosBloqueio.map((m) => (
+                  <li key={m}>{m}</li>
+                ))}
+              </ul>
+              <p>Valores apenas para referência; não representam economia aplicável.</p>
+            </div>
+          )}
+          {!bloqueada && semAlteracao && (
+            <p className="mb-4 text-sm text-muted-foreground">
+              Altere um parâmetro para registrar uma simulação.
+            </p>
+          )}
           {!resultado.compativel ? (
             <p className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {resultado.equipamentoSimulado.nome} não é compatível com rota de sufixo{" "}
@@ -255,7 +395,13 @@ function SimuladorRota() {
                     ? `Atual ${reaisLitro(resultado.atual.custoLitro)}`
                     : "A tarifa atual também está ausente"
                 }
-                tom={resultado.comparacao.custoLitro.favoravel ? "primario" : "critico"}
+                tom={
+                  bloqueada
+                    ? "neutro"
+                    : resultado.comparacao.custoLitro.favoravel
+                      ? "primario"
+                      : "critico"
+                }
               />
               <Kpi rotulo="Volume simulado" valor={litros(resultado.simulado.volumeL)} />
               <Kpi
@@ -273,7 +419,7 @@ function SimuladorRota() {
             </KpiGrid>
           </div>
 
-          <TabelaComparacao c={resultado.comparacao} />
+          <TabelaComparacao c={resultado.comparacao} neutra={bloqueada} />
 
           <div className="mt-6 rounded-md border border-border bg-surface px-4 py-3 text-sm text-muted-foreground">
             <Tag tom={rota.origem.mock ? "atencao" : "primario"}>

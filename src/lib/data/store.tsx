@@ -1,3 +1,4 @@
+import { simularRota } from "../calculations/simulation";
 import {
   createContext,
   useCallback,
@@ -148,7 +149,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
           unidades: UNIDADES,
           unidadeAtivaId: UNIDADES[0]!.id,
         })),
-      registrarSimulacao: (s) =>
+      registrarSimulacao: (s) => {
+        const rota = estado.rotas.find(
+          (r) =>
+            r.unidadeId === estado.unidadeAtivaId &&
+            r.codigo === s.rotaCodigo &&
+            r.ciclo === s.rotaCiclo,
+        );
+        if (!rota || !simularRota(rota, s, estado.tarifas, estado.transportadoras)?.viavel) return;
         setEstado((p) => ({
           ...p,
           simulacoes: [
@@ -159,11 +167,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
             },
             ...p.simulacoes,
           ].slice(0, 200),
-        })),
+        }));
+      },
       marcarAplicada: (id, aplicado) =>
         setEstado((p) => ({
           ...p,
-          simulacoes: p.simulacoes.map((s) => (s.id === id ? { ...s, aplicado } : s)),
+          simulacoes: p.simulacoes.map((s) => {
+            if (s.id !== id) return s;
+            const rota = p.rotas.find(
+              (r) =>
+                r.unidadeId === p.unidadeAtivaId &&
+                r.codigo === s.rotaCodigo &&
+                r.ciclo === s.rotaCiclo,
+            );
+            if (aplicado && (!rota || !simularRota(rota, s, p.tarifas, p.transportadoras)?.viavel))
+              return s;
+            return { ...s, aplicado };
+          }),
         })),
       removerSimulacao: (id) =>
         setEstado((p) => ({ ...p, simulacoes: p.simulacoes.filter((s) => s.id !== id) })),

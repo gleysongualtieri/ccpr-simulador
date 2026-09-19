@@ -48,6 +48,7 @@ function Relatorios() {
         const r = simularRota(
           linha.rota,
           {
+            ...s,
             aumentoVolumeL: s.aumentoVolumeL,
             aumentoKm: s.aumentoKm,
             equipamentoIdSimulado: s.equipamentoIdSimulado,
@@ -55,7 +56,7 @@ function Relatorios() {
           tarifas,
           transportadoras,
         );
-        return r ? [{ s, r }] : [];
+        return r?.viavel ? [{ s, r }] : [];
       });
   }, [simulacoes, linhas, tarifas, transportadoras]);
 

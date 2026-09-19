@@ -178,6 +178,7 @@ export function resolverTarifaRota(
   equipamentoId: string,
   tarifas: TarifaTransporte[],
   transportadoras: Transportadora[],
+  categoriaInformada?: CategoriaReboque,
 ): TarifaResolvida | undefined {
   const base = getEquipamento(equipamentoId);
   if (!base) return undefined;
@@ -187,7 +188,9 @@ export function resolverTarifaRota(
   const data = rota.dataExecucao?.slice(0, 10) || new Date().toISOString().slice(0, 10);
   const cnpjs = new Set(transportadora?.cnpjs ?? []);
   const categoriaReboque =
-    base.tipo === "reboque" ? categoriaReboquePorCapacidade(rota.capacidadeReboqueL) : undefined;
+    base.tipo === "reboque"
+      ? (categoriaReboquePorCapacidade(rota.capacidadeReboqueL) ?? categoriaInformada)
+      : undefined;
   const candidatas = tarifas
     .filter(
       (tarifa) =>
