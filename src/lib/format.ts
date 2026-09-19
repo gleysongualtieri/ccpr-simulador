@@ -28,3 +28,8 @@ export function variacao(v: number): string {
   const sinal = v > 0 ? "↑ +" : v < 0 ? "↓ " : "";
   return `${sinal}${percentual(v, 2)}`;
 }
+
+/** Mantém a precisão de mililitros nos avisos de excesso, sem alterar o cálculo. */
+export function litrosPrecisos(v: number): string {
+  return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 3 }).format(v)} L`;
+}

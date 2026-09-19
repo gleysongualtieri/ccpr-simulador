@@ -8,7 +8,7 @@ import { simularRota } from "@/lib/calculations/simulation";
 import { categoriaReboquePorCapacidade } from "@/lib/data/tariffs";
 import { EQUIPAMENTOS } from "@/lib/calculations/equipment";
 import { DESCRICAO_SUFIXO, equipamentosCompativeis } from "@/lib/calculations/compatibility";
-import { litros, percentual, reaisLitro } from "@/lib/format";
+import { litrosPrecisos, litros, percentual, reaisLitro } from "@/lib/format";
 import { encontrarRotaPorIdentificador, identificadorRotaUrl } from "@/lib/data/identity";
 
 export const Route = createFileRoute("/simulador/$codigo")({
@@ -374,8 +374,8 @@ function SimuladorRota() {
 
           {resultado.capacidade.excedida ? (
             <p className="mb-4 rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
-              Capacidade excedida em {litros(resultado.capacidade.excedenteL)} — o volume simulado
-              não cabe em {resultado.equipamentoSimulado.nome} (
+              Capacidade excedida em {litrosPrecisos(resultado.capacidade.excedenteL)} — o volume
+              simulado não cabe em {resultado.equipamentoSimulado.nome} (
               {litros(resultado.capacidade.capacidadeL)}). É necessário equipamento maior ou uma
               segunda viagem.
             </p>
@@ -406,8 +406,16 @@ function SimuladorRota() {
               <Kpi rotulo="Volume simulado" valor={litros(resultado.simulado.volumeL)} />
               <Kpi
                 rotulo="Ocupação simulada"
-                valor={percentual(resultado.simulado.ocupacao)}
-                detalhe={`Capacidade ${litros(resultado.simulado.capacidadeL)}`}
+                valor={
+                  resultado.capacidadeInformada
+                    ? percentual(resultado.simulado.ocupacao)
+                    : "Capacidade não informada"
+                }
+                detalhe={
+                  resultado.capacidadeInformada
+                    ? `Capacidade ${litros(resultado.simulado.capacidadeL)}`
+                    : "Preencha as capacidades para calcular a ocupação"
+                }
                 tom={resultado.capacidade.excedida ? "critico" : "neutro"}
               />
               <Kpi
@@ -419,7 +427,13 @@ function SimuladorRota() {
             </KpiGrid>
           </div>
 
-          <TabelaComparacao c={resultado.comparacao} neutra={bloqueada} />
+          <TabelaComparacao
+            c={resultado.comparacao}
+            neutra={bloqueada}
+            tarifaAtual={resultado.tarifaAtualEncontrada}
+            tarifaSimulada={resultado.tarifaSimuladaEncontrada}
+            capacidadeSimulada={resultado.capacidadeInformada}
+          />
 
           <div className="mt-6 rounded-md border border-border bg-surface px-4 py-3 text-sm text-muted-foreground">
             <Tag tom={rota.origem.mock ? "atencao" : "primario"}>

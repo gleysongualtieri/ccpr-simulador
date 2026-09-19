@@ -58,6 +58,9 @@ test("preserva capacidade real e bloqueia exatamente acima do limite", () => {
 test("troca de equipamento exige capacidade explícita e não usa catálogo fictício", () => {
   const e = { ...entrada, equipamentoIdSimulado: "toco_reboque" };
   assert.equal(sim(e).simulado.capacidadeL, 0);
+  assert.equal(sim(e).capacidadeInformada, false);
+  assert.equal(sim(e).capacidade.excedida, false);
+  assert.ok(!sim(e).motivosBloqueio.some((m) => m.includes("Capacidade excedida")));
   assert.equal(sim(e).viavel, false);
   const s = sim({
     ...e,
@@ -127,4 +130,18 @@ test("novos parâmetros sobrevivem à persistência e recompõem o cálculo", ()
   };
   const restored = lerEstadoPersistido(JSON.stringify({ simulacoes: [saved] }))!.simulacoes![0]!;
   assert.equal(sim(restored).simulado.capacidadeL, 36000);
+});
+
+test("aviso de excesso preserva fração do volume importado", () => {
+  const r = { ...rota, volumeL: 33090.001 };
+  const resultado = sim(
+    {
+      ...entrada,
+      equipamentoIdSimulado: "toco_reboque",
+      capacidadeVeiculoSimuladaL: 9000,
+      capacidadeReboqueSimuladaL: 15000,
+    } as typeof entrada,
+    r,
+  );
+  assert.ok(resultado.motivosBloqueio.includes("Capacidade excedida em 9.090,001 L."));
 });

@@ -1,3 +1,4 @@
+import { getEquipamento } from "@/lib/calculations/equipment";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { PageHeader, SectionTitle } from "@/components/ui-ccpr/PageHeader";
 import { Tag } from "@/components/ui-ccpr/Kpi";
@@ -127,7 +128,10 @@ function SimuladorIndex() {
                       {litros(s.aumentoVolumeL)}
                     </td>
                     <td className="px-3 py-3 text-right text-sm tabular">{s.aumentoKm} km</td>
-                    <td className="px-3 py-3 text-sm">{s.equipamentoIdSimulado}</td>
+                    <td className="px-3 py-3 text-sm">
+                      {getEquipamento(s.equipamentoIdSimulado)?.nome ??
+                        "Equipamento não identificado"}
+                    </td>
                     <td className="px-3 py-3 text-sm">
                       <label className="flex items-center gap-2">
                         <input

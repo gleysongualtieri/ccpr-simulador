@@ -1,3 +1,4 @@
+import { litrosPrecisos } from "../format.ts";
 import { getEquipamento } from "./equipment.ts";
 import { minutosEntre, formatarHoras } from "./routeJourney.ts";
 import { categoriaReboquePorCapacidade } from "../data/tariffs.ts";
@@ -37,6 +38,7 @@ export interface ResultadoSimulacao {
   atual: IndicadoresRota;
   simulado: IndicadoresRota;
   comparacao: Comparacao;
+  capacidadeInformada: boolean;
   capacidade: ResultadoCapacidade;
   compativel: boolean;
   tarifaAtualEncontrada: boolean;
@@ -96,10 +98,13 @@ export function simularRota(
   const capacidade = validarCapacidade(equipamentoSimulado, novoVolume, capacidadeSimuladaL);
   const compativel = isCompativel(rota.sufixoTipo, equipamentoSimulado.id);
   if (!compativel) motivosBloqueio.push("Equipamento incompatível com o tipo da rota.");
+  const capacidadeInformada = capacidadeSimuladaL !== undefined && capacidadeSimuladaL > 0;
+  if (!capacidadeInformada) {
+    capacidade.excedida = false;
+    capacidade.excedenteL = 0;
+  }
   if (capacidade.excedida)
-    motivosBloqueio.push(
-      `Capacidade excedida em ${capacidade.excedenteL.toLocaleString("pt-BR")} L.`,
-    );
+    motivosBloqueio.push(`Capacidade excedida em ${litrosPrecisos(capacidade.excedenteL)}.`);
   if (!rota.origem.mock && !atualResolvida.tarifa)
     motivosBloqueio.push("Tarifa da operação atual ausente.");
   if (!rota.origem.mock && !simuladaResolvida.tarifa)
@@ -114,6 +119,7 @@ export function simularRota(
     atual,
     simulado,
     comparacao: compararIndicadores(atual, simulado),
+    capacidadeInformada,
     capacidade,
     compativel,
     tarifaAtualEncontrada: rota.origem.mock || Boolean(atualResolvida.tarifa),
