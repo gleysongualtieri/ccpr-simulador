@@ -45,7 +45,11 @@ function Ranking() {
         .filter((l) =>
           busca.trim() ? l.rota.codigo.toLowerCase().includes(busca.trim().toLowerCase()) : true,
         )
-        .sort((a, b) => b.ind.custoLitro - a.ind.custoLitro),
+        .sort(
+          (a, b) =>
+            Number(b.tarifaEncontrada) - Number(a.tarifaEncontrada) ||
+            b.ind.custoLitro - a.ind.custoLitro,
+        ),
     [linhas, regiao, ciclo, busca],
   );
 
@@ -53,7 +57,7 @@ function Ranking() {
     <>
       <PageHeader
         titulo="Ranking de Rotas"
-        descricao="Rotas ordenadas do maior para o menor custo por litro. Use os filtros para isolar uma região ou um ciclo."
+        descricao="Rotas ordenadas do maior para o menor custo por litro. Rotas sem tarifa ficam ao final, sem posição no ranking. Use os filtros para isolar uma região ou um ciclo."
       />
 
       <div className="mb-6 flex flex-wrap items-end gap-4 rounded-md border border-border bg-surface p-4">
@@ -128,7 +132,9 @@ function Ranking() {
           <tbody>
             {filtradas.map((l, i) => (
               <tr key={chaveRota(l.rota)} className="border-t border-border hover:bg-surface/60">
-                <td className="py-3 pl-4 pr-3 text-sm tabular text-muted-foreground">{i + 1}</td>
+                <td className="py-3 pl-4 pr-3 text-sm tabular text-muted-foreground">
+                  {l.tarifaEncontrada ? i + 1 : "—"}
+                </td>
                 <td className="px-3 py-3 text-sm">
                   <Link
                     to="/rota/$codigo"

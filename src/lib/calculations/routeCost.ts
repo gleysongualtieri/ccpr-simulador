@@ -6,7 +6,15 @@ import type { Equipamento } from "@/lib/domain/types";
  */
 
 export function custoRota(equipamento: Equipamento, km: number): number {
-  return equipamento.diaria + km * equipamento.custoKm;
+  // Arredonda apenas o custo final da rota, com a mesma regra decimal da tela.
+  // Assim, CSV e agregações somam os centavos efetivamente apresentados.
+  return Number(
+    new Intl.NumberFormat("en-US", {
+      useGrouping: false,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(equipamento.diaria + km * equipamento.custoKm),
+  );
 }
 
 export function custoPorLitro(custo: number, volumeL: number): number {

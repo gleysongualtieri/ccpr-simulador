@@ -36,20 +36,34 @@ function VisaoGeral() {
   const total = agregarLinhas(linhas);
   const criticas = linhas.filter((l) => l.status === "critico");
   const jornadasCriticas = linhas.filter((l) => l.jornada.critica);
-  const maisCaras = [...linhas].sort((a, b) => b.ind.custoLitro - a.ind.custoLitro).slice(0, 5);
+  const maisCaras = linhas
+    .filter((l) => l.tarifaEncontrada)
+    .sort((a, b) => b.ind.custoLitro - a.ind.custoLitro)
+    .slice(0, 5);
+  const datasImportacao = linhas
+    .filter((l) => !l.rota.origem.mock)
+    .map((l) => Date.parse(l.rota.origem.importadoEm))
+    .filter(Number.isFinite);
+  const ultimaImportacao = datasImportacao.length
+    ? new Date(Math.max(...datasImportacao)).toLocaleString("pt-BR")
+    : null;
 
   const regioes = [...agruparPorRegiao(linhas.map((l) => l.rota)).entries()]
     .map(([regiao]) => ({
       regiao,
       ...agregarLinhas(linhas.filter((l) => l.rota.regiao === regiao)),
     }))
-    .sort((a, b) => b.custoLitro - a.custoLitro);
+    .sort(
+      (a, b) =>
+        Number(Boolean(a.tarifasAusentes)) - Number(Boolean(b.tarifasAusentes)) ||
+        b.custoLitro - a.custoLitro,
+    );
 
   return (
     <>
       <PageHeader
         titulo="Visão Geral da Operação"
-        descricao={`Roteirização atual da unidade ${unidade?.id ?? ""} — ${unidade?.nome ?? ""}. Os indicadores refletem os dados carregados hoje.`}
+        descricao={`Roteirização atual da unidade ${unidade?.id ?? ""} — ${unidade?.nome ?? ""}. ${ultimaImportacao ? `Última importação das rotas carregadas: ${ultimaImportacao}.` : "Indicadores dos dados disponíveis nesta unidade."}`}
         acoes={
           temDadosMock ? (
             <Tag tom="atencao">DADOS DE TESTE</Tag>
@@ -81,7 +95,7 @@ function VisaoGeral() {
           rotulo="Rotas críticas"
           valor={String(criticas.length)}
           tom={criticas.length ? "critico" : "neutro"}
-          detalhe="Custo fora do padrão, jornada ou capacidade"
+          detalhe="Tarifa ausente, jornada excedida, capacidade excedida ou equipamento incompatível"
         />
         <Kpi
           rotulo="Jornadas críticas"

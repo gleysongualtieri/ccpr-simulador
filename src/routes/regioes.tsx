@@ -39,11 +39,16 @@ function Regioes() {
           .filter((l) => l.rota.regiao === regiao)
           .sort((a, b) => b.ind.custoLitro - a.ind.custoLitro),
       }))
-      .sort((a, b) => b.agregado.custoLitro - a.agregado.custoLitro);
+      .sort(
+        (a, b) =>
+          Number(Boolean(a.agregado.tarifasAusentes)) -
+            Number(Boolean(b.agregado.tarifasAusentes)) ||
+          b.agregado.custoLitro - a.agregado.custoLitro,
+      );
   }, [linhas]);
 
   const total = agregarLinhas(linhas);
-  const pior = regioes[0];
+  const pior = regioes.find((r) => !r.agregado.tarifasAusentes);
 
   return (
     <>
@@ -55,13 +60,23 @@ function Regioes() {
       <KpiGrid>
         <Kpi rotulo="Regiões" valor={String(regioes.length)} />
         <Kpi rotulo="Volume total" valor={litros(total.volumeL)} />
-        <Kpi rotulo="Custo total" valor={total.tarifasAusentes ? "—" : reais(total.custo)} />
         <Kpi
-          rotulo="Pior R$/L regional"
+          rotulo="Custo total"
+          valor={total.tarifasAusentes ? "—" : reais(total.custo)}
+          detalhe={
+            total.tarifasAusentes ? `${total.tarifasAusentes} rota(s) sem tarifa oficial` : ""
+          }
+        />
+        <Kpi
+          rotulo="Maior R$/L regional"
           valor={
             pior && !pior.agregado.tarifasAusentes ? reaisLitro(pior.agregado.custoLitro) : "—"
           }
-          detalhe={pior ? `Região ${pior.regiao}` : ""}
+          detalhe={
+            pior
+              ? `Região ${pior.regiao} · Entre regiões com tarifas completas`
+              : "Nenhuma região com tarifas completas"
+          }
           tom="critico"
         />
       </KpiGrid>
@@ -70,6 +85,12 @@ function Regioes() {
         {regioes.map((r) => (
           <section key={r.regiao}>
             <SectionTitle hint={`${r.agregado.rotas} rota(s)`}>Região {r.regiao}</SectionTitle>
+            {r.agregado.tarifasAusentes > 0 ? (
+              <p className="mb-3 text-sm text-destructive">
+                {r.agregado.tarifasAusentes} rota(s) sem tarifa oficial. Custo e R$/L regionais
+                indisponíveis; região fora da comparação de custos.
+              </p>
+            ) : null}
             <div className="overflow-hidden rounded-md border border-border bg-card">
               <div className="grid grid-cols-2 gap-4 border-b border-border bg-surface px-4 py-3 text-sm md:grid-cols-5">
                 <div>
