@@ -60,12 +60,15 @@ function Relatorios() {
       });
   }, [simulacoes, linhas, tarifas, transportadoras]);
 
-  const ganhoCustoLitro = aplicadas.length
+  const variacaoMediaCustoLitro = aplicadas.length
     ? aplicadas.reduce((acc, a) => acc + (a.r.simulado.custoLitro - a.r.atual.custoLitro), 0) /
       aplicadas.length
     : 0;
 
   function exportarCsv() {
+    // Sem separador de milhares, para leitura numérica no Excel em português.
+    const numeroCsv = (valor: number, casas?: number) =>
+      (casas === undefined ? String(valor) : valor.toFixed(casas)).replace(".", ",");
     const cab = [
       "rota",
       "sufixo",
@@ -78,8 +81,8 @@ function Relatorios() {
       "custo_rs",
       "rs_por_litro",
       "densidade_l_km",
-      "ocupacao",
-      "jornada_h",
+      "ocupacao_percentual",
+      "jornada_horas_decimais",
       "situacao",
     ];
     const linhasCsv = linhas.map((l) =>
@@ -91,12 +94,12 @@ function Relatorios() {
         l.rota.veiculo,
         l.equipamento.nome,
         Math.round(l.ind.volumeL),
-        l.ind.km,
-        l.tarifaEncontrada ? l.ind.custo.toFixed(2) : "",
-        l.tarifaEncontrada ? l.ind.custoLitro.toFixed(4) : "",
-        l.ind.densidade.toFixed(2),
-        (l.ind.ocupacao * 100).toFixed(1),
-        l.jornada.horas.toFixed(2),
+        numeroCsv(l.ind.km),
+        l.tarifaEncontrada ? numeroCsv(l.ind.custo, 2) : "",
+        l.tarifaEncontrada ? numeroCsv(l.ind.custoLitro, 4) : "",
+        numeroCsv(l.ind.densidade, 2),
+        numeroCsv(l.ind.ocupacao * 100, 1),
+        numeroCsv(l.jornada.horas, 2),
         l.status,
       ]),
     );
@@ -147,13 +150,21 @@ function Relatorios() {
           rotulo="Simulações aplicadas"
           valor={String(aplicadas.length)}
           detalhe={
-            aplicadas.length ? `Média R$/L ${reaisLitro(Math.abs(ganhoCustoLitro))}` : "Nenhuma"
+            aplicadas.length
+              ? `Variação média do custo por litro: ${variacaoMediaCustoLitro > 0 ? "+" : variacaoMediaCustoLitro < 0 ? "−" : ""}${reaisLitro(Math.abs(variacaoMediaCustoLitro))}`
+              : "Nenhuma"
           }
         />
       </KpiGrid>
 
       <section className="mt-10">
         <SectionTitle hint="marcadas como aplicadas no simulador">Plano de ação</SectionTitle>
+        {aplicadas.length > 0 ? (
+          <p className="mb-4 text-sm text-muted-foreground">
+            A variação média é a média simples das diferenças entre o R$/L simulado e o atual de
+            cada simulação aplicada. Valor positivo indica aumento; negativo, redução.
+          </p>
+        ) : null}
         <div className="overflow-hidden rounded-md border border-border bg-card">
           <table className="w-full">
             <thead>
