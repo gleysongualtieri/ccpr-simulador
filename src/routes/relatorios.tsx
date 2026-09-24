@@ -82,7 +82,7 @@ function Relatorios() {
       "rs_por_litro",
       "densidade_l_km",
       "ocupacao_percentual",
-      "jornada_horas_decimais",
+      "jornada_hh_mm",
       "situacao",
     ];
     const linhasCsv = linhas.map((l) =>
@@ -99,7 +99,7 @@ function Relatorios() {
         l.tarifaEncontrada ? numeroCsv(l.ind.custoLitro, 4) : "",
         numeroCsv(l.ind.densidade, 2),
         numeroCsv(l.ind.ocupacao * 100, 1),
-        numeroCsv(l.jornada.horas, 2),
+        formatarHoras(l.jornada.horas).replace("h", ":"),
         l.status,
       ]),
     );
