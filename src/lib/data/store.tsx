@@ -20,6 +20,7 @@ import { PRODUTORES_MOCK, ROTAS_MOCK, UNIDADES } from "./seed";
 import { chaveProdutorRota, chaveRota } from "./identity";
 import { associarTransportadorasImportadas, TRANSPORTADORAS_INICIAIS } from "./tariffs";
 import { lerEstadoPersistido } from "./persistence";
+import { lerProjeto, serializarProjeto, type Projeto } from "./project";
 
 /**
  * Repositório de dados da aplicação.
@@ -41,6 +42,8 @@ interface Estado {
 
 interface RepositorioDados extends Estado {
   hidratado: boolean;
+  erroPersistencia: boolean;
+  abrirProjeto: (projeto: Projeto) => void;
   temDadosMock: boolean;
   setUnidadeAtiva: (id: string) => void;
   substituirBase: (rotas: RotaOperacional[], produtores: Produtor[]) => void;
@@ -68,6 +71,7 @@ const Ctx = createContext<RepositorioDados | null>(null);
 export function DataProvider({ children }: { children: ReactNode }) {
   const [estado, setEstado] = useState<Estado>(estadoInicial);
   const [hidratado, setHidratado] = useState(false);
+  const [erroPersistencia, setErroPersistencia] = useState(false);
 
   useEffect(() => {
     try {
@@ -84,8 +88,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (!hidratado) return;
     try {
       localStorage.setItem(CHAVE, JSON.stringify(estado));
+      setErroPersistencia(false);
     } catch {
-      /* quota indisponível — a sessão continua funcionando em memória */
+      setErroPersistencia(true);
     }
   }, [estado, hidratado]);
 
@@ -137,6 +142,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     () => ({
       ...estado,
       hidratado,
+      erroPersistencia,
+      abrirProjeto: (projeto) => {
+        const dados = lerProjeto(serializarProjeto(projeto)).dados;
+        try {
+          localStorage.setItem(CHAVE, JSON.stringify(dados));
+        } catch {
+          throw new Error(
+            "O navegador não tem espaço disponível para abrir este projeto com segurança. Os dados atuais foram mantidos.",
+          );
+        }
+        setEstado(dados);
+        setErroPersistencia(false);
+      },
       temDadosMock: estado.rotas.some((r) => r.origem.mock),
       setUnidadeAtiva: (id) => setEstado((p) => ({ ...p, unidadeAtivaId: id })),
       substituirBase,
@@ -202,7 +220,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ].sort((a, b) => a.sigla.localeCompare(b.sigla)),
         })),
     }),
-    [estado, hidratado, substituirBase, mesclarBase],
+    [estado, hidratado, erroPersistencia, substituirBase, mesclarBase],
   );
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;

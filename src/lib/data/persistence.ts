@@ -93,7 +93,7 @@ const transportadora = z.object({
   ativa: z.boolean(),
 });
 
-const estadoPersistido = z
+export const estadoPersistido = z
   .object({
     unidades: z.array(unidade).max(500),
     rotas: z.array(rota).max(50_000),

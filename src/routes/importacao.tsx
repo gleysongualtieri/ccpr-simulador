@@ -1,3 +1,4 @@
+import { ProjectFiles } from "@/components/projects/ProjectFiles";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, SectionTitle } from "@/components/ui-ccpr/PageHeader";
@@ -192,6 +193,13 @@ function Importacao() {
             <Tag tom="primario">Base atual: dado real</Tag>
           )
         }
+      />
+
+      <ProjectFiles
+        aoAbrir={() => {
+          setPrevia(null);
+          setMensagem("");
+        }}
       />
 
       <div className="rounded-md border border-dashed border-border bg-surface p-8 text-center">
