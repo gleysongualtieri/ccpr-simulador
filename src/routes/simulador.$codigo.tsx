@@ -47,6 +47,7 @@ function SimuladorRota() {
   const [categoriaReboqueSimulada, setCategoria] = useState<"comum" | "trucado" | undefined>();
   const conjunto = EQUIPAMENTOS.find((e) => e.id === equipamentoIdSimulado)?.tipo === "reboque";
   const [salvo, setSalvo] = useState(false);
+  const [erroRegistro, setErroRegistro] = useState("");
 
   useEffect(() => {
     setEquipamentoIdSimulado(rota?.equipamentoId ?? "");
@@ -56,6 +57,7 @@ function SimuladorRota() {
     setAumentoVolumeL(0);
     setAumentoKm(0);
     setSalvo(false);
+    setErroRegistro("");
   }, [rota]);
 
   const compativeis = useMemo(() => (rota ? equipamentosCompativeis(rota.sufixoTipo) : []), [rota]);
@@ -291,18 +293,26 @@ function SimuladorRota() {
                 disabled={semAlteracao || bloqueada}
                 onClick={() => {
                   if (bloqueada || semAlteracao) return;
-                  registrarSimulacao({
-                    capacidadeVeiculoSimuladaL,
-                    capacidadeReboqueSimuladaL,
-                    categoriaReboqueSimulada,
-                    rotaCodigo: rota.codigo,
-                    rotaCiclo: rota.ciclo,
-                    aumentoVolumeL,
-                    aumentoKm,
-                    equipamentoIdSimulado: resultado.equipamentoSimulado.id,
-                    aplicado: false,
-                  });
-                  setSalvo(true);
+                  setErroRegistro("");
+                  setSalvo(false);
+                  try {
+                    registrarSimulacao({
+                      capacidadeVeiculoSimuladaL,
+                      capacidadeReboqueSimuladaL,
+                      categoriaReboqueSimulada,
+                      rotaCodigo: rota.codigo,
+                      rotaCiclo: rota.ciclo,
+                      aumentoVolumeL,
+                      aumentoKm,
+                      equipamentoIdSimulado: resultado.equipamentoSimulado.id,
+                      aplicado: false,
+                    });
+                    setSalvo(true);
+                  } catch (e) {
+                    setErroRegistro(
+                      e instanceof Error ? e.message : "Não foi possível registrar a simulação.",
+                    );
+                  }
                 }}
                 className="inline-flex h-11 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -318,12 +328,18 @@ function SimuladorRota() {
                   setReboque(rota.capacidadeReboqueL ?? 0);
                   setCategoria(undefined);
                   setSalvo(false);
+                  setErroRegistro("");
                 }}
                 className="inline-flex h-11 items-center rounded-md border border-border px-5 text-sm text-foreground transition-colors hover:bg-surface"
               >
                 Limpar
               </button>
             </div>
+            {erroRegistro && (
+              <p role="alert" className="text-sm text-destructive">
+                {erroRegistro}
+              </p>
+            )}
             {salvo ? (
               <p className="text-sm text-primary">
                 Simulação registrada.{" "}

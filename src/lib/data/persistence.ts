@@ -53,6 +53,7 @@ const produtor = z.object({
   dataColeta: texto(64).optional(),
 });
 const simulacao = z.object({
+  unidadeId: texto(20).optional(),
   capacidadeVeiculoSimuladaL: numero.optional(),
   capacidadeReboqueSimuladaL: numero.optional(),
   categoriaReboqueSimulada: z.enum(["comum", "trucado"]).optional(),
@@ -102,11 +103,25 @@ export const estadoPersistido = z
     tarifas: z.array(tarifa).max(50_000),
     transportadoras: z.array(transportadora).max(1_000),
     unidadeAtivaId: texto(20),
+    projetos: z
+      .array(
+        z.object({ unidadeId: texto(20), nome: texto(120), autor: texto(120), salvoEm: texto(64) }),
+      )
+      .max(500)
+      .optional(),
   })
   .partial()
   .strict();
 
+export interface MetaProjeto {
+  unidadeId: string;
+  nome: string;
+  autor: string;
+  salvoEm: string;
+}
+
 export interface EstadoPersistido {
+  projetos?: MetaProjeto[];
   unidades?: Unidade[];
   rotas?: RotaOperacional[];
   produtores?: Produtor[];
@@ -123,5 +138,24 @@ export function lerEstadoPersistido(bruto: string): EstadoPersistido | null {
     return resultado.success ? (resultado.data as EstadoPersistido) : null;
   } catch {
     return null;
+  }
+}
+
+/** Valida e grava antes de o chamador substituir a sessão em memória. */
+export function gravarEstadoPersistido(
+  estado: EstadoPersistido,
+  escrever: (texto: string) => void,
+): void {
+  const texto = JSON.stringify(estado);
+  if (!lerEstadoPersistido(texto))
+    throw new Error(
+      "O conjunto de unidades excede os limites da sessão. Salve seus projetos antes de continuar.",
+    );
+  try {
+    escrever(texto);
+  } catch {
+    throw new Error(
+      "Não foi possível guardar a alteração no navegador. A sessão anterior foi mantida. Salve seus projetos antes de liberar espaço.",
+    );
   }
 }

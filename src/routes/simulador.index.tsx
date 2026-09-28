@@ -1,3 +1,4 @@
+import { unidadeDaSimulacao } from "@/lib/data/project";
 import { getEquipamento } from "@/lib/calculations/equipment";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { PageHeader, SectionTitle } from "@/components/ui-ccpr/PageHeader";
@@ -28,7 +29,14 @@ export const Route = createFileRoute("/simulador/")({
 
 function SimuladorIndex() {
   const linhas = useLinhasRota();
-  const { simulacoes, marcarAplicada, removerSimulacao } = useDados();
+  const {
+    simulacoes: todasSimulacoes,
+    rotas,
+    unidadeAtivaId,
+    marcarAplicada,
+    removerSimulacao,
+  } = useDados();
+  const simulacoes = todasSimulacoes.filter((s) => unidadeDaSimulacao(s, rotas) === unidadeAtivaId);
   const navigate = useNavigate();
 
   const ordenadas = [...linhas].sort((a, b) => b.ind.custoLitro - a.ind.custoLitro);

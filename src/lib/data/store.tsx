@@ -19,8 +19,8 @@ import type {
 import { PRODUTORES_MOCK, ROTAS_MOCK, UNIDADES } from "./seed";
 import { chaveProdutorRota, chaveRota } from "./identity";
 import { associarTransportadorasImportadas, TRANSPORTADORAS_INICIAIS } from "./tariffs";
-import { lerEstadoPersistido } from "./persistence";
-import { lerProjeto, serializarProjeto, type Projeto } from "./project";
+import { type MetaProjeto, lerEstadoPersistido, gravarEstadoPersistido } from "./persistence";
+import { incorporarProjeto, unidadeDaSimulacao, type Projeto } from "./project";
 
 /**
  * Repositório de dados da aplicação.
@@ -31,6 +31,7 @@ import { lerProjeto, serializarProjeto, type Projeto } from "./project";
 const CHAVE = "ccpr.simulador-operacional.v1";
 
 interface Estado {
+  projetos: MetaProjeto[];
   unidades: Unidade[];
   rotas: RotaOperacional[];
   produtores: Produtor[];
@@ -43,7 +44,8 @@ interface Estado {
 interface RepositorioDados extends Estado {
   hidratado: boolean;
   erroPersistencia: boolean;
-  abrirProjeto: (projeto: Projeto) => void;
+  abrirProjeto: (projeto: Projeto, unidadeId: string) => void;
+  identificarProjeto: (nome: string, autor: string) => void;
   temDadosMock: boolean;
   setUnidadeAtiva: (id: string) => void;
   substituirBase: (rotas: RotaOperacional[], produtores: Produtor[]) => void;
@@ -57,6 +59,7 @@ interface RepositorioDados extends Estado {
 }
 
 const estadoInicial: Estado = {
+  projetos: [],
   unidades: UNIDADES,
   rotas: ROTAS_MOCK,
   produtores: PRODUTORES_MOCK,
@@ -106,6 +109,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         ...prev,
         rotas,
         produtores,
+        projetos: [],
         unidades: unidades.length ? unidades : prev.unidades,
         unidadeAtivaId: unidades[0]?.id ?? prev.unidadeAtivaId,
       };
@@ -143,25 +147,42 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ...estado,
       hidratado,
       erroPersistencia,
-      abrirProjeto: (projeto) => {
-        const dados = lerProjeto(serializarProjeto(projeto)).dados;
-        try {
-          localStorage.setItem(CHAVE, JSON.stringify(dados));
-        } catch {
-          throw new Error(
-            "O navegador não tem espaço disponível para abrir este projeto com segurança. Os dados atuais foram mantidos.",
-          );
-        }
+      identificarProjeto: (nome, autor) =>
+        setEstado((p) => ({
+          ...p,
+          projetos: [
+            ...p.projetos.filter((m) => m.unidadeId !== p.unidadeAtivaId),
+            {
+              unidadeId: p.unidadeAtivaId,
+              nome: nome.slice(0, 120),
+              autor: autor.slice(0, 120),
+              salvoEm: new Date().toISOString(),
+            },
+          ],
+        })),
+      abrirProjeto: (projeto, unidadeId) => {
+        const dados = {
+          ...incorporarProjeto(estado, projeto, unidadeId),
+          projetos: [
+            ...estado.projetos.filter((m) => m.unidadeId !== unidadeId),
+            { unidadeId, nome: projeto.nome, autor: projeto.autor, salvoEm: projeto.salvoEm },
+          ],
+        };
+        gravarEstadoPersistido(dados, (texto) => localStorage.setItem(CHAVE, texto));
         setEstado(dados);
         setErroPersistencia(false);
       },
-      temDadosMock: estado.rotas.some((r) => r.origem.mock),
+      temDadosMock: estado.rotas.some(
+        (r) => r.unidadeId === estado.unidadeAtivaId && r.origem.mock,
+      ),
       setUnidadeAtiva: (id) => setEstado((p) => ({ ...p, unidadeAtivaId: id })),
       substituirBase,
       mesclarBase,
       restaurarDadosTeste: () =>
         setEstado((p) => ({
           ...p,
+          projetos: [],
+          simulacoes: [],
           rotas: ROTAS_MOCK,
           produtores: PRODUTORES_MOCK,
           unidades: UNIDADES,
@@ -174,24 +195,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
             r.codigo === s.rotaCodigo &&
             r.ciclo === s.rotaCiclo,
         );
-        if (!rota || !simularRota(rota, s, estado.tarifas, estado.transportadoras)?.viavel) return;
-        setEstado((p) => ({
-          ...p,
+        if (!rota || !simularRota(rota, s, estado.tarifas, estado.transportadoras)?.viavel)
+          throw new Error("A simulação não pode ser registrada. Revise os parâmetros da rota.");
+        const dados = {
+          ...estado,
           simulacoes: [
             {
               ...s,
-              id: `${s.rotaCodigo}-${Date.now()}`,
+              unidadeId: estado.unidadeAtivaId,
+              id: crypto.randomUUID(),
               criadaEm: new Date().toISOString(),
             },
-            ...p.simulacoes,
-          ].slice(0, 200),
-        }));
+            ...estado.simulacoes,
+          ],
+        };
+        gravarEstadoPersistido(dados, (texto) => localStorage.setItem(CHAVE, texto));
+        setEstado(dados);
+        setErroPersistencia(false);
       },
       marcarAplicada: (id, aplicado) =>
         setEstado((p) => ({
           ...p,
           simulacoes: p.simulacoes.map((s) => {
-            if (s.id !== id) return s;
+            if (s.id !== id || unidadeDaSimulacao(s, p.rotas) !== p.unidadeAtivaId) return s;
             const rota = p.rotas.find(
               (r) =>
                 r.unidadeId === p.unidadeAtivaId &&
@@ -204,7 +230,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
           }),
         })),
       removerSimulacao: (id) =>
-        setEstado((p) => ({ ...p, simulacoes: p.simulacoes.filter((s) => s.id !== id) })),
+        setEstado((p) => ({
+          ...p,
+          simulacoes: p.simulacoes.filter(
+            (s) => s.id !== id || unidadeDaSimulacao(s, p.rotas) !== p.unidadeAtivaId,
+          ),
+        })),
       substituirTarifas: (tarifas) =>
         setEstado((p) => ({
           ...p,

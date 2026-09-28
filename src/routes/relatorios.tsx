@@ -1,3 +1,4 @@
+import { unidadeDaSimulacao } from "@/lib/data/project";
 import { useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, SectionTitle } from "@/components/ui-ccpr/PageHeader";
@@ -31,7 +32,7 @@ export const Route = createFileRoute("/relatorios")({
 
 function Relatorios() {
   const linhas = useLinhasRota();
-  const { simulacoes, unidades, unidadeAtivaId, tarifas, transportadoras } = useDados();
+  const { simulacoes, rotas, unidades, unidadeAtivaId, tarifas, transportadoras } = useDados();
   const unidade = unidades.find((u) => u.id === unidadeAtivaId);
 
   const total = agregarLinhas(linhas);
@@ -39,7 +40,7 @@ function Relatorios() {
 
   const aplicadas = useMemo(() => {
     return simulacoes
-      .filter((s) => s.aplicado)
+      .filter((s) => s.aplicado && unidadeDaSimulacao(s, rotas) === unidadeAtivaId)
       .flatMap((s) => {
         const linha = linhas.find(
           (l) => l.rota.codigo === s.rotaCodigo && (!s.rotaCiclo || l.rota.ciclo === s.rotaCiclo),
@@ -58,7 +59,7 @@ function Relatorios() {
         );
         return r?.viavel ? [{ s, r }] : [];
       });
-  }, [simulacoes, linhas, tarifas, transportadoras]);
+  }, [simulacoes, linhas, tarifas, transportadoras, rotas, unidadeAtivaId]);
 
   const variacaoMediaCustoLitro = aplicadas.length
     ? aplicadas.reduce((acc, a) => acc + (a.r.simulado.custoLitro - a.r.atual.custoLitro), 0) /

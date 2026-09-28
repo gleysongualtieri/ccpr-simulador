@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useDados } from "@/lib/data/store";
 import { SectionTitle } from "@/components/ui-ccpr/PageHeader";
 import {
-  criarProjeto,
+  criarProjetoUnidade,
+  dadosDaUnidade,
   lerProjeto,
   LIMITE_PROJETO_BYTES,
   nomeArquivoProjeto,
@@ -16,13 +17,33 @@ const campo = "mt-1 block h-11 w-full rounded-md border border-border bg-card px
 
 export function ProjectFiles({ aoAbrir }: { aoAbrir: () => void }) {
   const dados = useDados();
-  const [nome, setNome] = useState("");
-  const [autor, setAutor] = useState("");
+  const meta = dados.projetos.find((p) => p.unidadeId === dados.unidadeAtivaId);
+  const nome = meta?.nome ?? "";
+  const autor = meta?.autor ?? "";
+  const setNome = (valor: string) => dados.identificarProjeto(valor, autor);
+  const setAutor = (valor: string) => dados.identificarProjeto(nome, valor);
+  const [unidadeParaAbrir, setUnidadeParaAbrir] = useState("");
+  let resumo = null;
+  let erroResumo = "";
+  try {
+    resumo = dadosDaUnidade(dados, dados.unidadeAtivaId);
+  } catch (e) {
+    erroResumo = e instanceof Error ? e.message : "Não foi possível separar a unidade.";
+  }
+  let resumoPrevia = null;
+
   const [previa, setPrevia] = useState<Projeto | null>(null);
   const [confirmado, setConfirmado] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState("");
   const [lendo, setLendo] = useState(false);
+  if (previa) {
+    try {
+      resumoPrevia = dadosDaUnidade(previa.dados, unidadeParaAbrir);
+    } catch {
+      /* confirmação permanece bloqueada */
+    }
+  }
 
   function salvar() {
     setErro("");
@@ -30,7 +51,7 @@ export function ProjectFiles({ aoAbrir }: { aoAbrir: () => void }) {
     try {
       const { unidades, rotas, produtores, simulacoes, tarifas, transportadoras, unidadeAtivaId } =
         dados;
-      const projeto = criarProjeto(
+      const projeto = criarProjetoUnidade(
         { unidades, rotas, produtores, simulacoes, tarifas, transportadoras, unidadeAtivaId },
         nome,
         autor,
@@ -61,7 +82,9 @@ export function ProjectFiles({ aoAbrir }: { aoAbrir: () => void }) {
     setLendo(true);
     try {
       if (file.size > LIMITE_PROJETO_BYTES) throw new Error("Selecione um projeto de até 8 MB.");
-      setPrevia(lerProjeto(await file.text()));
+      const projeto = lerProjeto(await file.text());
+      setPrevia(projeto);
+      setUnidadeParaAbrir(projeto.dados.unidadeAtivaId);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível ler o projeto.");
     } finally {
@@ -75,15 +98,21 @@ export function ProjectFiles({ aoAbrir }: { aoAbrir: () => void }) {
         Projetos salvos
       </SectionTitle>
       <p className="mb-4 text-sm text-muted-foreground">
-        O arquivo .ccpr reúne todas as unidades carregadas, rotas, produtores, capacidades, tarifas,
-        transportadoras e simulações registradas. Não inclui os arquivos CSV/XLSX originais nem
-        alterações de simulação ainda não registradas. Ao reabrir, os resultados são calculados com
-        as regras da versão atual do simulador.
+        O arquivo .ccpr salva somente a unidade selecionada, com suas rotas, produtores,
+        capacidades, tarifas, transportadoras e simulações registradas. Não inclui os arquivos
+        CSV/XLSX originais nem alterações de simulação ainda não registradas. Ao reabrir, os
+        resultados são calculados com as regras da versão atual do simulador.
       </p>
       <p className="mb-4 text-sm">
-        Base atual: {dados.rotas.length} rotas · {dados.produtores.length} vínculos de produtores ·{" "}
-        {dados.simulacoes.length} simulações · {dados.tarifas.length} tarifas.
+        Unidade {dados.unidadeAtivaId}: {resumo?.rotas.length ?? "—"} rotas ·{" "}
+        {resumo?.produtores.length ?? "—"} vínculos de produtores ·{" "}
+        {resumo?.simulacoes.length ?? "—"} simulações · {resumo?.tarifas.length ?? "—"} tarifas.
       </p>
+      {erroResumo && (
+        <p role="alert" className="mb-4 text-destructive">
+          {erroResumo}
+        </p>
+      )}
       <div className="mb-4 grid gap-4 md:grid-cols-2">
         <label className="text-sm">
           Nome da versão
@@ -114,10 +143,10 @@ export function ProjectFiles({ aoAbrir }: { aoAbrir: () => void }) {
         <button
           type="button"
           className={botao}
-          disabled={!dados.hidratado || !nome.trim() || !autor.trim()}
+          disabled={!dados.hidratado || !nome.trim() || !autor.trim() || !resumo}
           onClick={salvar}
         >
-          Salvar projeto atual (.ccpr)
+          Salvar unidade atual (.ccpr)
         </button>
         <label className={`${botao} cursor-pointer`}>
           {lendo ? "Lendo projeto…" : "Selecionar projeto para abrir"}
@@ -161,15 +190,38 @@ export function ProjectFiles({ aoAbrir }: { aoAbrir: () => void }) {
           <p className="mt-2 text-sm">
             Unidades: {previa.dados.unidades.map((u) => `${u.id} — ${u.nome}`).join(", ")}
           </p>
+          <label className="mt-3 block text-sm">
+            Unidade a abrir
+            <select
+              className={campo}
+              value={unidadeParaAbrir}
+              onChange={(e) => {
+                setUnidadeParaAbrir(e.target.value);
+                setConfirmado(false);
+              }}
+            >
+              {previa.dados.unidades.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.id} — {u.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!resumoPrevia && (
+            <p role="alert" className="mt-2 text-destructive">
+              Não foi possível identificar a unidade de todos os registros deste arquivo. A abertura
+              está bloqueada.
+            </p>
+          )}
           <p className="mt-2 text-sm">
-            {previa.dados.rotas.length} rotas · {previa.dados.produtores.length} vínculos de
-            produtores · {previa.dados.simulacoes.length} simulações · {previa.dados.tarifas.length}{" "}
-            tarifas
+            {resumoPrevia?.rotas.length ?? "—"} rotas · {resumoPrevia?.produtores.length ?? "—"}{" "}
+            vínculos de produtores · {resumoPrevia?.simulacoes.length ?? "—"} simulações ·{" "}
+            {resumoPrevia?.tarifas.length ?? "—"} tarifas
           </p>
           <p className="mt-3 text-sm">
-            Abrir substituirá todas as unidades, tarifas e simulações desta sessão pelo conteúdo do
-            arquivo. Salve o projeto atual acima se quiser mantê-lo. Nada será mesclado
-            automaticamente.
+            Abrir substituirá as rotas, produtores, tarifas e simulações apenas da unidade{" "}
+            {unidadeParaAbrir}. As outras unidades serão preservadas. Salve a versão atual dessa
+            unidade antes de substituí-la, se precisar mantê-la.
           </p>
           <label className="my-4 flex items-start gap-2 text-sm">
             <input
@@ -183,13 +235,12 @@ export function ProjectFiles({ aoAbrir }: { aoAbrir: () => void }) {
             <button
               type="button"
               className={`${botao} bg-primary text-primary-foreground`}
-              disabled={!confirmado || !dados.hidratado}
+              disabled={!confirmado || !dados.hidratado || !resumoPrevia}
               onClick={() => {
                 try {
-                  dados.abrirProjeto(previa);
+                  dados.abrirProjeto(previa, unidadeParaAbrir);
                   aoAbrir();
-                  setNome(previa.nome);
-                  setAutor(previa.autor);
+
                   setPrevia(null);
                   setConfirmado(false);
                   setErro("");

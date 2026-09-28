@@ -129,6 +129,7 @@ export interface Unidade {
 }
 
 export interface SimulacaoRapida {
+  unidadeId?: string | undefined;
   capacidadeVeiculoSimuladaL?: number | undefined;
   capacidadeReboqueSimuladaL?: number | undefined;
   categoriaReboqueSimulada?: "comum" | "trucado" | undefined;

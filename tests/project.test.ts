@@ -8,7 +8,7 @@ import {
   LIMITE_PROJETO_BYTES,
   type DadosProjeto,
 } from "../src/lib/data/project.ts";
-import { lerEstadoPersistido } from "../src/lib/data/persistence.ts";
+import { lerEstadoPersistido, gravarEstadoPersistido } from "../src/lib/data/persistence.ts";
 
 const dados: DadosProjeto = {
   unidades: [{ id: "0081", nome: "Uberlândia" }],
@@ -93,7 +93,7 @@ test("projeto transporta integralmente capacidades, tarifas precisas, vínculos 
 test("recusa versões incompatíveis, arquivo parcial, dados inválidos e JSON corrompido", () => {
   const projeto = criarProjeto(dados, "Estudo", "Analista");
   for (const valor of [
-    { ...projeto, versao: 2 },
+    { ...projeto, versao: 99 },
     { ...projeto, dados: { rotas: [] } },
     { ...projeto, dados: { ...dados, rotas: [{ ...dados.rotas[0], km: -1 }] } },
   ]) {
@@ -112,5 +112,152 @@ test("recusa unidade ativa inexistente e rotas de unidades ausentes", () => {
       "Estudo",
       "Analista",
     ),
+  );
+});
+
+// Duas bases podem compartilhar códigos de rota e identificadores de simulação.
+import {
+  criarProjetoUnidade,
+  incorporarProjeto,
+  dadosDaUnidade,
+  unidadeDaSimulacao,
+} from "../src/lib/data/project.ts";
+
+function duasUnidades(): DadosProjeto {
+  return {
+    ...dados,
+    unidades: [...dados.unidades, { id: "0002", nome: "Conselheiro Lafaiete" }],
+    rotas: [...dados.rotas, { ...dados.rotas[0]!, unidadeId: "0002", km: 99 }],
+    produtores: [...dados.produtores, { ...dados.produtores[0]!, unidadeId: "0002" }],
+    simulacoes: [
+      { ...dados.simulacoes[0]!, unidadeId: "0081" },
+      { ...dados.simulacoes[0]!, id: "sim-outra", unidadeId: "0002" },
+    ],
+    tarifas: [...dados.tarifas, { ...dados.tarifas[0]!, id: "t2", unidadeId: "0002", diaria: 321 }],
+  };
+}
+
+test("salvar unidade não exporta rotas, produtores, tarifas ou simulações de outra base", () => {
+  const projeto = lerProjeto(
+    serializarProjeto(criarProjetoUnidade(duasUnidades(), "Uberlândia", "Gleyson")),
+  );
+  assert.equal(projeto.versao, 2);
+  for (const itens of [
+    projeto.dados.rotas,
+    projeto.dados.produtores,
+    projeto.dados.tarifas,
+    projeto.dados.simulacoes,
+  ]) {
+    assert.equal(itens.length, 1);
+    assert.equal(itens[0]!.unidadeId, "0081");
+  }
+});
+
+test("abrir unidade preserva integralmente outra base com o mesmo código de rota", () => {
+  const atual = duasUnidades();
+  const novo = criarProjetoUnidade(
+    { ...dados, rotas: [{ ...dados.rotas[0]!, km: 284 }] },
+    "Novo",
+    "Gleyson",
+  );
+  const resultado = incorporarProjeto(atual, novo, "0081");
+  assert.deepEqual(dadosDaUnidade(resultado, "0002"), dadosDaUnidade(atual, "0002"));
+  assert.equal(resultado.rotas.find((r) => r.unidadeId === "0081")!.km, 284);
+  assert.equal(atual.rotas[0]!.km, 283);
+  assert.equal(
+    resultado.simulacoes.filter((s) => unidadeDaSimulacao(s, resultado.rotas) === "0081").length,
+    1,
+  );
+});
+
+test("legado migra simulação inequívoca; associação ambígua nunca é adivinhada", () => {
+  const legado = lerProjeto(serializarProjeto(criarProjeto(dados, "Legado", "Gleyson")));
+  assert.equal(dadosDaUnidade(legado.dados, "0081").simulacoes[0]!.unidadeId, "0081");
+  const ambiguo = { ...duasUnidades(), simulacoes: dados.simulacoes };
+  assert.throws(() => dadosDaUnidade(ambiguo, "0081"), /sem unidade/);
+});
+
+test("cadastro conflitante de transportadora compartilhada bloqueia abertura sem mutação", () => {
+  const atual = duasUnidades();
+  const antes = JSON.stringify(atual);
+  const novo = criarProjetoUnidade(
+    { ...dados, transportadoras: [{ ...dados.transportadoras[0]!, cnpjs: ["12345678000199"] }] },
+    "Novo",
+    "Gleyson",
+  );
+  assert.throws(() => incorporarProjeto(atual, novo, "0081"), /conflita/);
+  assert.equal(JSON.stringify(atual), antes);
+});
+
+test("nome e responsável de cada unidade sobrevivem à persistência", () => {
+  const projetos = [
+    {
+      unidadeId: "0081",
+      nome: "Estudo Uberlândia",
+      autor: "Gleyson",
+      salvoEm: "2026-09-27T21:00:00.000Z",
+    },
+    {
+      unidadeId: "0002",
+      nome: "Estudo Lafaiete",
+      autor: "Analista",
+      salvoEm: "2026-09-27T21:00:00.000Z",
+    },
+  ];
+  assert.deepEqual(
+    lerEstadoPersistido(JSON.stringify({ ...duasUnidades(), projetos }))?.projetos,
+    projetos,
+  );
+});
+
+test("identificadores repetidos são separados sem afetar simulações de outra unidade", () => {
+  const atual = duasUnidades();
+  atual.simulacoes = [
+    { ...dados.simulacoes[0]!, unidadeId: "0002", id: "x".repeat(100) },
+    { ...dados.simulacoes[0]!, unidadeId: "0002", id: `importado-1-${"x".repeat(65)}` },
+  ];
+  const novo = criarProjetoUnidade(
+    {
+      ...dados,
+      simulacoes: [
+        { ...dados.simulacoes[0]!, id: "x".repeat(100) },
+        { ...dados.simulacoes[0]!, id: "x".repeat(100) },
+      ],
+    },
+    "Estudo",
+    "Gleyson",
+  );
+  const resultado = incorporarProjeto(atual, novo, "0081");
+  assert.equal(new Set(resultado.simulacoes.map((s) => s.id)).size, 4);
+  assert.deepEqual(resultado.simulacoes.slice(0, 2), atual.simulacoes);
+  assert.ok(lerEstadoPersistido(JSON.stringify(resultado)));
+});
+
+test("limite de simulações não substitui a sessão anterior por dados que não poderiam reabrir", () => {
+  let salvo = JSON.stringify(dados);
+  const antes = salvo;
+  assert.throws(
+    () =>
+      gravarEstadoPersistido(
+        {
+          ...dados,
+          simulacoes: Array.from({ length: 10_001 }, (_, i) => ({
+            ...dados.simulacoes[0]!,
+            id: String(i),
+          })),
+        },
+        (texto) => {
+          salvo = texto;
+        },
+      ),
+    /limites/,
+  );
+  assert.equal(salvo, antes);
+  assert.throws(
+    () =>
+      gravarEstadoPersistido(dados, () => {
+        throw new Error("QuotaExceededError");
+      }),
+    /sessão anterior foi mantida/,
   );
 });
