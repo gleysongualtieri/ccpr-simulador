@@ -6,6 +6,7 @@ import { TabelaComparacao } from "@/components/ui-ccpr/Comparacao";
 import { useDados, useRotasUnidade } from "@/lib/data/store";
 import { simularRota } from "@/lib/calculations/simulation";
 import { categoriaReboquePorCapacidade } from "@/lib/data/tariffs";
+import { rotuloFimJornada } from "@/lib/calculations/routeJourney";
 import { EQUIPAMENTOS } from "@/lib/calculations/equipment";
 import { DESCRICAO_SUFIXO, equipamentosCompativeis } from "@/lib/calculations/compatibility";
 import { litrosPrecisos, litros, percentual, reaisLitro } from "@/lib/format";
@@ -357,8 +358,8 @@ function SimuladorRota() {
         <section>
           <SectionTitle hint="cálculo em tempo real">Resultado</SectionTitle>
           <p className="mb-4 text-sm text-muted-foreground">
-            A jornada verificada é a original, entre Saída e Balanza. Alterações de km não estimam
-            uma nova duração.
+            A jornada verificada é a original, entre Saída e {rotuloFimJornada(rota)}. Alterações de
+            km não estimam uma nova duração.
           </p>
 
           {bloqueada && (

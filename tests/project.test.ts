@@ -27,6 +27,7 @@ const dados: DadosProjeto = {
       km: 283,
       inicioRota: "05:45",
       chegadaBase: "16:10",
+      atividadeFimJornada: "descarregamento",
       capacidadeVeiculoInformadaL: 18500,
       capacidadeReboqueL: 15000,
       capacidadeRealL: 33500,

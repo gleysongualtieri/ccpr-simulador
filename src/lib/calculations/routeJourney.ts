@@ -2,12 +2,26 @@ import type { RotaOperacional } from "@/lib/domain/types";
 
 /**
  * Cálculo de jornada (PRD 6.5).
- * Jornada = chegada na base (pesagem, ANTES da descarga) − início da rota.
- * Não inclui descarga nem regresso após descarga.
+ * Jornada = horário do evento de fim − início da rota.
+ * Usa pesagem/Serviço; na ausência de ambos, o registro de Descarregamento.
+ * Não acrescenta duração de descarga nem regresso após o evento escolhido.
  * Havendo troca de motorista, avalia-se a jornada POR TRECHO/MOTORISTA.
  */
 
 export const LIMITE_JORNADA_H = 13;
+
+export function rotuloFimJornada(rota: RotaOperacional): string {
+  switch (rota.atividadeFimJornada) {
+    case "descarregamento":
+      return "Descarregamento";
+    case "servico":
+      return "Serviço";
+    case "balanca":
+      return "Balança";
+    default:
+      return "Balança/Serviço";
+  }
+}
 
 export function minutosEntre(inicio: string, fim: string): number {
   const [hi, mi] = inicio.split(":").map(Number);

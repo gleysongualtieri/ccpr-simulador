@@ -32,6 +32,7 @@ const rota = z.object({
   km: numero,
   inicioRota: texto(10),
   chegadaBase: texto(10),
+  atividadeFimJornada: z.enum(["balanca", "servico", "descarregamento"]).optional(),
   dataExecucao: texto(64).optional(),
   trechos: z.array(trecho).max(100).optional(),
   origem,

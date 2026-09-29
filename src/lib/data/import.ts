@@ -183,7 +183,9 @@ const ATIVIDADES_CONHECIDAS = [
 
 /** Aliases de atividade encontrados nas exportações (Serviço = Balanza). */
 const MAPEAMENTO_ATIVIDADES: Record<string, string> = {
+  balanca: "balanza",
   servico: "balanza",
+  descarregamento: "descarrega",
 };
 
 interface EventoBruto {
@@ -414,18 +416,27 @@ export function importarRouteNow(
       }
 
       const indiceInicio = execucao.indexOf(eventoInicio);
-      const balanza = execucao.slice(indiceInicio).find((e) => e.atividade === "balanza");
+      const eventosAposInicio = execucao.slice(indiceInicio);
+      const balanza = eventosAposInicio.find((e) => e.atividade === "balanza");
+      // Pesagem/Serviço têm prioridade. Sem eles, usamos o horário do
+      // descarregamento, sem somar novamente as linhas de descarga ao volume.
+      const eventoChegada = balanza ?? eventosAposInicio.find((e) => e.atividade === "descarrega");
 
-      if (!balanza) {
+      if (!eventoChegada) {
         problemas.push({
           severidade: "erro",
           entidade: codigo,
           campo: "balanza",
-          mensagem: "Execução sem evento Balanza — não é possível calcular a jornada.",
+          mensagem:
+            "Execução sem Balanza/Balança, Serviço ou Descarregamento — não é possível calcular a jornada.",
         });
         continue;
       }
-      const eventoChegada = balanza;
+      const atividadeFimJornada = balanza
+        ? normalizar(balanza.atividadeBruta) === "servico"
+          ? "servico"
+          : "balanca"
+        : "descarregamento";
 
       const inicioRota = eventoInicio.hora;
       const chegadaBase = eventoChegada.hora;
@@ -523,6 +534,7 @@ export function importarRouteNow(
         km,
         inicioRota,
         chegadaBase,
+        atividadeFimJornada,
         dataExecucao: dataExecucao ? dataExecucao.toISOString() : undefined,
         origem,
         capacidadeRealL,

@@ -5,7 +5,7 @@ import { useLinhasRota } from "@/lib/data/selectors";
 import { useDados } from "@/lib/data/store";
 import { DESCRICAO_SUFIXO } from "@/lib/calculations/compatibility";
 import { decodificarVeiculo } from "@/lib/calculations/equipment";
-import { formatarHoras, LIMITE_JORNADA_H } from "@/lib/calculations/routeJourney";
+import { formatarHoras, LIMITE_JORNADA_H, rotuloFimJornada } from "@/lib/calculations/routeJourney";
 import { densidadeFmt, km as fmtKm, litros, percentual, reais, reaisLitro } from "@/lib/format";
 import { encontrarRotaPorIdentificador, identificadorRotaUrl } from "@/lib/data/identity";
 
@@ -108,7 +108,7 @@ function DetalheRota() {
 
       <div className="mt-10 grid gap-8 lg:grid-cols-2">
         <section>
-          <SectionTitle hint="chegada na base − início da rota (sem descarga e regresso)">
+          <SectionTitle hint={`Saída → ${rotuloFimJornada(rota)} (horário registrado no arquivo)`}>
             Jornada
           </SectionTitle>
           <div className="rounded-md border border-border bg-card p-5">
@@ -118,7 +118,7 @@ function DetalheRota() {
                 <dd className="mt-1 tabular">{rota.inicioRota}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Chegada na base (pesagem)</dt>
+                <dt className="text-muted-foreground">Fim da jornada ({rotuloFimJornada(rota)})</dt>
                 <dd className="mt-1 tabular">{rota.chegadaBase}</dd>
               </div>
               <div>

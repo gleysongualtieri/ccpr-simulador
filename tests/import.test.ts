@@ -7,7 +7,8 @@ import {
   importarProdutoresRotas,
   importarRouteNow,
 } from "../src/lib/data/import.ts";
-import { calcularJornada } from "../src/lib/calculations/routeJourney.ts";
+import { calcularJornada, rotuloFimJornada } from "../src/lib/calculations/routeJourney.ts";
+import { lerEstadoPersistido } from "../src/lib/data/persistence.ts";
 import { decodificarVeiculo, equipamentoPorSigla } from "../src/lib/calculations/equipment.ts";
 import type { Produtor, RotaOperacional } from "../src/lib/domain/types.ts";
 import {
@@ -191,12 +192,76 @@ test("rotas com o mesmo código permanecem distintas por ciclo", () => {
   assert.equal(encontrarRotaPorIdentificador([base, impar], "2783R--impar"), impar);
 });
 
-test("ausência de Balanza é erro bloqueante", () => {
+test("sem pesagem ou Serviço, Descarrega/Descarregamento encerra a jornada", () => {
+  for (const atividade of ["Descarrega", "Descarregamento"]) {
+    const rota = rotaImportada(
+      routeNow([
+        "0081VIA09TO01;;2783R;Saída;0081;BASE;;0;09/09 22:00;-18,8;-48,3",
+        "0081VIA09TO01;1;2783R;Coleta;123456789;PRODUTOR;1.000;165;09/09 23:00;-19,8;-47,6",
+        `0081VIA09TO01;;2783R;${atividade};123456789;PRODUTOR;600;417;10/09 02:15;-18,8;-48,3`,
+        `0081VIA09TO01;;2783R;${atividade};123456789;PRODUTOR;400;417;10/09 02:15;-18,8;-48,3`,
+        "0081VIA09TO01;;2783R;Regresso;0081;BASE;;418;10/09 04:00;-18,8;-48,3",
+      ]),
+    );
+    assert.equal(rota.chegadaBase, "02:15");
+    assert.equal(rota.atividadeFimJornada, "descarregamento");
+    assert.equal(rotuloFimJornada(rota), "Descarregamento");
+    assert.equal(calcularJornada(rota).horasBrutas, 4.25);
+    assert.equal(rota.ciclo, "impar");
+    assert.equal(rota.volumeL, 1000);
+    assert.equal(rota.km, 418);
+    assert.equal(
+      lerEstadoPersistido(JSON.stringify({ rotas: [rota] }))?.rotas?.[0]?.atividadeFimJornada,
+      "descarregamento",
+    );
+  }
+});
+
+test("Balanza, Balança e Serviço têm prioridade mesmo se houver descarga anterior", () => {
+  for (const atividade of ["Balanza", "Balança", "Serviço"]) {
+    const rota = rotaImportada(
+      routeNow([
+        "0081VIA09TO01;;2783R;Saída;0081;BASE;;0;09/09 01:31;-18,8;-48,3",
+        "0081VIA09TO01;1;2783R;Coleta;123456789;PRODUTOR;1.000;165;09/09 04:35;-19,8;-47,6",
+        "0081VIA09TO01;;2783R;Descarrega;123456789;PRODUTOR;1.000;410;09/09 12:00;-18,8;-48,3",
+        `0081VIA09TO01;;2783R;${atividade};0081;BASE;;417;09/09 13:16;-18,8;-48,3`,
+      ]),
+    );
+    assert.equal(rota.chegadaBase, "13:16");
+    assert.equal(rota.atividadeFimJornada, atividade === "Serviço" ? "servico" : "balanca");
+  }
+});
+
+test("escolha do fim da jornada é independente para cada execução da rota", () => {
+  const resultado = importarRouteNow(
+    routeNow([
+      "0081VIA09TO01;;2783R;Saída;0081;BASE;;0;09/09 06:00;-18,8;-48,3",
+      "0081VIA09TO01;1;2783R;Coleta;123456789;PRODUTOR;1.000;165;09/09 07:00;-19,8;-47,6",
+      "0081VIA09TO01;;2783R;Balanza;0081;BASE;;417;09/09 13:00;-18,8;-48,3",
+      "0081VIA09TO01;;2783R;Saída;0081;BASE;;0;10/09 06:00;-18,8;-48,3",
+      "0081VIA09TO01;1;2783R;Coleta;123456789;PRODUTOR;1.000;165;10/09 07:00;-19,8;-47,6",
+      "0081VIA09TO01;;2783R;Descarrega;123456789;PRODUTOR;1.000;417;10/09 14:00;-18,8;-48,3",
+    ]),
+    "duas_execucoes.csv",
+    "0081",
+    2026,
+  );
+  assert.deepEqual(resultado.problemas, []);
+  assert.deepEqual(
+    resultado.rotas.map((r) => [r.ciclo, r.chegadaBase, r.atividadeFimJornada]),
+    [
+      ["impar", "13:00", "balanca"],
+      ["par", "14:00", "descarregamento"],
+    ],
+  );
+});
+
+test("ausência de pesagem, Serviço e Descarregamento continua bloqueando jornada", () => {
   const resultado = importarRouteNow(
     routeNow([
       "0081VIA09TO01;;2783R;Saída;0081;BASE;;0;09/09 01:31;-18,8;-48,3",
       "0081VIA09TO01;1;2783R;Coleta;123456789;PRODUTOR;1.000;165;09/09 04:35;-19,8;-47,6",
-      "0081VIA09TO01;;2783R;Descarrega;123456789;PRODUTOR;1.000;417;09/09 13:20;-18,8;-48,3",
+      "0081VIA09TO01;;2783R;Regresso;0081;BASE;;418;09/09 15:20;-18,8;-48,3",
     ]),
     "Route_now_sem_balanza.csv",
     "0081",

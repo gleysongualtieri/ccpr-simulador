@@ -1,6 +1,6 @@
 import { litrosPrecisos } from "../format.ts";
 import { getEquipamento } from "./equipment.ts";
-import { minutosEntre, formatarHoras } from "./routeJourney.ts";
+import { minutosEntre, formatarHoras, rotuloFimJornada } from "./routeJourney.ts";
 import { categoriaReboquePorCapacidade } from "../data/tariffs.ts";
 import type {
   Equipamento,
@@ -68,7 +68,7 @@ export function simularRota(
   const jornada = minutosEntre(rota.inicioRota, rota.chegadaBase) / 60;
   if (jornada > 13)
     motivosBloqueio.push(
-      `Jornada de ${formatarHoras(jornada)} entre Saída e Balanza excede o limite de 13h.`,
+      `Jornada de ${formatarHoras(jornada)} entre Saída e ${rotuloFimJornada(rota)} excede o limite de 13h.`,
     );
   if (![entrada.aumentoVolumeL, entrada.aumentoKm].every((n) => Number.isFinite(n) && n >= 0))
     motivosBloqueio.push(

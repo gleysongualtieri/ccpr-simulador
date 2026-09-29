@@ -98,8 +98,10 @@ export interface RotaOperacional {
   km: number;
   /** HH:MM — início da rota */
   inicioRota: string;
-  /** HH:MM — chegada na base (pesagem/Balanza, antes da descarga) */
+  /** HH:MM — pesagem/Serviço, ou Descarregamento quando ambos estão ausentes */
   chegadaBase: string;
+  /** Evento usado como fim da jornada; ausente em arquivos de versões anteriores. */
+  atividadeFimJornada?: "balanca" | "servico" | "descarregamento" | undefined;
   /** ISO — data/hora do evento de início da execução, quando disponível */
   dataExecucao?: string | undefined;
   /** Trechos por motorista, quando houver troca de motorista registrada */
