@@ -8,9 +8,7 @@ import {
   aplicarRegiaoDosProdutores,
   auditarBase,
   decodeTextoDoArquivo,
-  identificarTipoArquivo,
-  importarProdutoresRotas,
-  importarRouteNow,
+  importarArquivosAxiodis,
 } from "@/lib/data/import";
 import type { ProblemaQualidade, Produtor, RotaOperacional } from "@/lib/domain/types";
 import {
@@ -76,11 +74,9 @@ function Importacao() {
     setCarregando(true);
     setMensagem("");
     try {
-      let rotas: RotaOperacional[] = [];
-      let produtores: Produtor[] = [];
       const problemas: ProblemaQualidade[] = [];
       const arquivos: string[] = [];
-      const tiposLidos = new Set<string>();
+      const textos: { nome: string; texto: string }[] = [];
 
       for (const file of Array.from(files)) {
         if (file.size > TAMANHO_MAXIMO_ARQUIVO_BYTES) {
@@ -94,43 +90,12 @@ function Importacao() {
         }
         const texto = await lerArquivoComEncodingCorreto(file);
         arquivos.push(file.name);
-        const tipoArquivo = identificarTipoArquivo(texto);
-        if (!tipoArquivo) {
-          problemas.push({
-            severidade: "erro",
-            entidade: file.name,
-            campo: "cabecalho",
-            mensagem: "Tipo de arquivo não reconhecido pelo cabeçalho.",
-          });
-          continue;
-        }
-        tiposLidos.add(tipoArquivo);
-        const resultado =
-          tipoArquivo === "produtores_rotas"
-            ? importarProdutoresRotas(texto, file.name, anoReferencia)
-            : importarRouteNow(texto, file.name, unidadeAtivaId, anoReferencia);
-        rotas = [...rotas, ...resultado.rotas];
-        produtores = [...produtores, ...resultado.produtores];
-        problemas.push(...resultado.problemas);
+        textos.push({ nome: file.name, texto });
       }
 
-      if (!tiposLidos.has("route_now")) {
-        problemas.push({
-          severidade: "erro",
-          entidade: "Importação",
-          campo: "arquivo",
-          mensagem: "Selecione pelo menos um arquivo RouteNow.",
-        });
-      }
-      if (!tiposLidos.has("produtores_rotas")) {
-        problemas.push({
-          severidade: "erro",
-          entidade: "Importação",
-          campo: "arquivo",
-          mensagem: "Selecione pelo menos um arquivo Produtores_Rotas.",
-        });
-      }
-
+      const resultado = importarArquivosAxiodis(textos, unidadeAtivaId, anoReferencia);
+      const { rotas, produtores } = resultado;
+      problemas.push(...resultado.problemas);
       const rotasComRegiao = aplicarRegiaoDosProdutores(rotas, produtores);
       setPrevia({ rotas: rotasComRegiao, produtores, problemasImportacao: problemas, arquivos });
     } catch {

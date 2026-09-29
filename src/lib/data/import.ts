@@ -7,6 +7,7 @@ import {
   getEquipamento,
 } from "../calculations/equipment.ts";
 import { extrairSufixo, isCompativel } from "../calculations/compatibility.ts";
+import { chaveRota } from "./identity.ts";
 
 /**
  * Leitura, validação e transformação dos arquivos exportados do Axiodis
@@ -164,7 +165,10 @@ export interface PreviaImportacao {
   produtores: Produtor[];
   problemas: ProblemaQualidade[];
   linhasLidas: number;
+  rotasIgnoradas?: IdentidadeRota[];
 }
+
+type IdentidadeRota = Pick<RotaOperacional, "unidadeId" | "codigo" | "ciclo">;
 
 const ATIVIDADES_CONHECIDAS = [
   "coleta",
@@ -273,6 +277,7 @@ export function importarRouteNow(
   const linhas = parseDelimitado(texto);
   const problemas: ProblemaQualidade[] = [];
   const rotas: RotaOperacional[] = [];
+  const rotasIgnoradas: IdentidadeRota[] = [];
   if (linhas.length < 2) {
     problemas.push({
       severidade: "erro",
@@ -318,8 +323,8 @@ export function importarRouteNow(
     mock: false,
   };
 
-  // 1. Agrupar eventos por código de rota
-  const grupos = new Map<string, EventoBruto[]>();
+  // O mesmo código pode existir em unidades diferentes no mesmo arquivo.
+  const grupos = new Map<string, { codigo: string; eventos: EventoBruto[] }>();
   for (let i = 1; i < linhas.length; i++) {
     const l = linhas[i]!;
     const codigo = (l[iRota] ?? "").trim().toUpperCase();
@@ -332,7 +337,7 @@ export function importarRouteNow(
       atividade,
       atividadeBruta,
       veiculo: (l[iVeiculo] ?? "").trim().toUpperCase(),
-      km: numeroOuZero(l[iKm]),
+      km: numero(l[iKm]),
       volume: numeroOuZero(l[iVolume]),
       data,
       hora: horaDe(data),
@@ -347,12 +352,14 @@ export function importarRouteNow(
         mensagem: `Atividade não reconhecida "${atividadeBruta}" — evento mantido para revisão.`,
       });
     }
-    const lista = grupos.get(codigo) ?? [];
-    lista.push(evento);
-    grupos.set(codigo, lista);
+    const unidade = evento.unidade || decodificarVeiculo(evento.veiculo).unidade || unidadeIdPadrao;
+    const chave = `${unidade}|${codigo}`;
+    const grupo = grupos.get(chave) ?? { codigo, eventos: [] };
+    grupo.eventos.push(evento);
+    grupos.set(chave, grupo);
   }
 
-  for (const [codigo, eventosBrutos] of grupos) {
+  for (const { codigo, eventos: eventosBrutos } of grupos.values()) {
     const sufixo = extrairSufixo(codigo);
     if (!sufixo) {
       problemas.push({
@@ -396,7 +403,7 @@ export function importarRouteNow(
 
       // No RouteNow, "Km etapa" é a distância acumulada desde a saída.
       // O maior valor da execução coincide com "Distância Total" do Produtores_Rotas.
-      const km = Math.max(0, ...execucao.map((e) => e.km));
+      const km = Math.max(0, ...execucao.map((e) => (Number.isFinite(e.km) ? e.km : 0)));
       const volumeL =
         Math.round(
           execucao.filter((e) => e.atividade === "coleta").reduce((s, e) => s + e.volume, 0) * 1000,
@@ -406,6 +413,30 @@ export function importarRouteNow(
       const primeiro = comData[0] ?? execucao[0]!;
 
       const eventoInicio = saida ?? primeiro;
+      const dataExecucao = eventoInicio.data;
+      if (!dataExecucao) {
+        problemas.push({
+          severidade: "erro",
+          entidade: codigo,
+          campo: "data_hora",
+          mensagem: "Data/hora inválida. Confira o ano de referência e o arquivo RouteNow.",
+        });
+        continue;
+      }
+      const ciclo: "par" | "impar" = dataExecucao.getDate() % 2 === 0 ? "par" : "impar";
+      const decodificado = decodificarVeiculo(veiculo);
+      const unidadeId = (
+        execucao.find((e) => e.unidade)?.unidade ||
+        decodificado.unidade ||
+        unidadeIdPadrao
+      ).trim();
+
+      // Entrada administrativa de leite de cooperativa: exclusão temporária.
+      // Exige zero informado em todos os eventos; ausência/erro de km não vale como zero.
+      if (sufixo === "E" && execucao.every((e) => e.km === 0)) {
+        rotasIgnoradas.push({ unidadeId, codigo, ciclo });
+        continue;
+      }
       if (!saida) {
         problemas.push({
           severidade: "alerta",
@@ -440,8 +471,7 @@ export function importarRouteNow(
 
       const inicioRota = eventoInicio.hora;
       const chegadaBase = eventoChegada.hora;
-      const dataExecucao = eventoInicio.data;
-      if (!dataExecucao || !eventoChegada.data) {
+      if (!eventoChegada.data) {
         problemas.push({
           severidade: "erro",
           entidade: codigo,
@@ -450,10 +480,7 @@ export function importarRouteNow(
         });
         continue;
       }
-      const ciclo: "par" | "impar" = dataExecucao.getDate() % 2 === 0 ? "par" : "impar";
-
       // 4. Compatibilidade uma vez por execução
-      const decodificado = decodificarVeiculo(veiculo);
       let equipamento = decodificado.sigla ? equipamentoPorSigla(decodificado.sigla) : undefined;
       if (!equipamento) {
         problemas.push({
@@ -520,11 +547,7 @@ export function importarRouteNow(
       rotas.push({
         codigo,
         sufixoTipo: sufixo,
-        unidadeId: (
-          execucao.find((e) => e.unidade)?.unidade ||
-          decodificado.unidade ||
-          unidadeIdPadrao
-        ).trim(),
+        unidadeId,
         regiao: execucao.find((e) => e.regiao)?.regiao || "—",
         ciclo,
         veiculo,
@@ -544,13 +567,14 @@ export function importarRouteNow(
     }
   }
 
-  return { rotas, produtores: [], problemas, linhasLidas: linhas.length - 1 };
+  return { rotas, produtores: [], problemas, rotasIgnoradas, linhasLidas: linhas.length - 1 };
 }
 
 export function importarProdutoresRotas(
   texto: string,
   arquivo: string,
   anoReferencia = new Date().getFullYear(),
+  rotasIgnoradas: IdentidadeRota[] = [],
 ): PreviaImportacao {
   if (excedeLimiteDeRegistros(texto)) return problemaLimiteDeRegistros(arquivo);
   const linhas = parseDelimitado(texto);
@@ -593,8 +617,20 @@ export function importarProdutoresRotas(
   }
 
   const agrupados = new Map<string, Produtor>();
+  const chavesIgnoradas = new Set(rotasIgnoradas.map(chaveRota));
   for (let i = 1; i < linhas.length; i++) {
     const l = linhas[i]!;
+    const dataColeta = parseDataHora(l[iDataHora], anoReferencia);
+    const ciclo = dataColeta ? (dataColeta.getDate() % 2 === 0 ? "par" : "impar") : undefined;
+    const rotaCodigo = (l[iRota] ?? "").trim().toUpperCase();
+    const unidadeId = decodificarVeiculo(l[iVeiculo]).unidade;
+    if (
+      unidadeId &&
+      ciclo &&
+      chavesIgnoradas.has(chaveRota({ unidadeId, codigo: rotaCodigo, ciclo }))
+    )
+      continue;
+
     const codigo = (l[iCodigo] ?? "").replace(/\D/g, "");
     if (!codigo) continue;
     if (codigo.length < 9) {
@@ -617,7 +653,6 @@ export function importarProdutoresRotas(
       });
     }
 
-    const dataColeta = parseDataHora(l[iDataHora], anoReferencia);
     if (!dataColeta) {
       problemas.push({
         severidade: "erro",
@@ -627,12 +662,6 @@ export function importarProdutoresRotas(
       });
       continue;
     }
-    const ciclo: "par" | "impar" | undefined = dataColeta
-      ? dataColeta.getDate() % 2 === 0
-        ? "par"
-        : "impar"
-      : undefined;
-    const rotaCodigo = (l[iRota] ?? "").trim().toUpperCase();
     if (!rotaCodigo) {
       problemas.push({
         severidade: "erro",
@@ -642,7 +671,6 @@ export function importarProdutoresRotas(
       });
       continue;
     }
-    const unidadeId = decodificarVeiculo(l[iVeiculo]).unidade;
     const chave = `${unidadeId}|${codigo}|${rotaCodigo}|${ciclo ?? "sem-ciclo"}`;
     const existente = agrupados.get(chave);
     if (existente) {
@@ -670,6 +698,87 @@ export function importarProdutoresRotas(
   produtores.push(...agrupados.values());
 
   return { rotas: [], produtores, problemas, linhasLidas: linhas.length - 1 };
+}
+
+/** RouteNow define as exclusões antes da leitura dos vínculos, em qualquer ordem de seleção. */
+export function importarArquivosAxiodis(
+  arquivos: { nome: string; texto: string }[],
+  unidadeIdPadrao: string,
+  anoReferencia = new Date().getFullYear(),
+): PreviaImportacao {
+  const rotas: RotaOperacional[] = [];
+  const produtores: Produtor[] = [];
+  const problemas: ProblemaQualidade[] = [];
+  const ignoradas = new Map<string, IdentidadeRota>();
+  const classificados = arquivos.map((arquivo) => ({
+    ...arquivo,
+    tipo: identificarTipoArquivo(arquivo.texto),
+  }));
+  let linhasLidas = 0;
+
+  for (const arquivo of classificados) {
+    if (!arquivo.tipo) {
+      problemas.push({
+        severidade: "erro",
+        entidade: arquivo.nome,
+        campo: "cabecalho",
+        mensagem: "Tipo de arquivo não reconhecido pelo cabeçalho.",
+      });
+    }
+    if (arquivo.tipo !== "route_now") continue;
+    const resultado = importarRouteNow(arquivo.texto, arquivo.nome, unidadeIdPadrao, anoReferencia);
+    rotas.push(...resultado.rotas);
+    problemas.push(...resultado.problemas);
+    linhasLidas += resultado.linhasLidas;
+    for (const rota of resultado.rotasIgnoradas ?? []) ignoradas.set(chaveRota(rota), rota);
+  }
+
+  // Arquivos conflitantes não podem excluir os vínculos de uma rota com percurso.
+  for (const rota of rotas) {
+    if (!ignoradas.delete(chaveRota(rota))) continue;
+    problemas.push({
+      severidade: "erro",
+      entidade: `${rota.unidadeId} / ${rota.codigo} / ${rota.ciclo}`,
+      campo: "km",
+      mensagem:
+        "Rota E com km zero e com percurso na mesma unidade e ciclo. Revise os arquivos selecionados.",
+    });
+  }
+  const rotasIgnoradas = [...ignoradas.values()];
+  for (const rota of rotasIgnoradas) {
+    problemas.push({
+      severidade: "alerta",
+      entidade: `${rota.unidadeId} / ${rota.codigo} / ${rota.ciclo}`,
+      campo: "rota ignorada",
+      mensagem:
+        "Rota E com 0 km ignorada temporariamente (entrada de leite de cooperativa). Seus volumes e vínculos de produtores ficam fora da análise.",
+    });
+  }
+  for (const arquivo of classificados) {
+    if (arquivo.tipo !== "produtores_rotas") continue;
+    const resultado = importarProdutoresRotas(
+      arquivo.texto,
+      arquivo.nome,
+      anoReferencia,
+      rotasIgnoradas,
+    );
+    produtores.push(...resultado.produtores);
+    problemas.push(...resultado.problemas);
+    linhasLidas += resultado.linhasLidas;
+  }
+  for (const [tipo, nome] of [
+    ["route_now", "RouteNow"],
+    ["produtores_rotas", "Produtores_Rotas"],
+  ] as const) {
+    if (classificados.some((arquivo) => arquivo.tipo === tipo)) continue;
+    problemas.push({
+      severidade: "erro",
+      entidade: "Importação",
+      campo: "arquivo",
+      mensagem: `Selecione pelo menos um arquivo ${nome}.`,
+    });
+  }
+  return { rotas, produtores, problemas, rotasIgnoradas, linhasLidas };
 }
 
 /** Aplica a região (linha do produtor) sobre as rotas importadas — RF10. */

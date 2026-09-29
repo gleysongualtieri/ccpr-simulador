@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   auditarBase,
   identificarTipoArquivo,
+  importarArquivosAxiodis,
   importarProdutoresRotas,
   importarRouteNow,
 } from "../src/lib/data/import.ts";
@@ -286,4 +287,149 @@ test("data impossível é rejeitada", () => {
 
   assert.equal(resultado.rotas.length, 0);
   assert.ok(resultado.problemas.some((p) => p.campo === "data_hora"));
+});
+
+function eventosCooperativa(unidade = "0077", dia = "28", km = "0", codigo = "2094E") {
+  const veiculo = `${unidade}COO09TO01`;
+  return [
+    `${veiculo};;${codigo};Saída;${unidade};BASE;;0;${dia}/09 07:59;;`,
+    `${veiculo};1;${codigo};Coleta;123456789;COOPERATIVA;50,000;${km};${dia}/09 08:00;;`,
+    `${veiculo};;${codigo};Descarrega;${unidade};BASE;50,000;${km};${dia}/09 08:06;;`,
+  ];
+}
+
+const CABECALHO_PRODUTORES = "Código;Nome;Rota;Volume/coleta;Veículo;Dt / Hr Coleta";
+
+test("rota E com zero km e seus vínculos ficam fora da análise em qualquer ordem dos arquivos", () => {
+  const arquivos = [
+    { nome: "route.csv", texto: routeNow(eventosCooperativa()) },
+    {
+      nome: "produtores.csv",
+      texto: [
+        CABECALHO_PRODUTORES,
+        "123456789;COOPERATIVA;2094E;50,000;0077COO09TO01;28/09 08:00",
+        // Até códigos ainda não suportados ficam fora, pois o vínculo pertence à rota ignorada.
+        "603165;COOPERATIVA;2094E;50,000;0077COO09TO01;28/09 08:00",
+      ].join("\n"),
+    },
+  ];
+  for (const ordem of [arquivos, [...arquivos].reverse()]) {
+    const resultado = importarArquivosAxiodis(ordem, "0081", 2026);
+    assert.deepEqual(resultado.rotas, []);
+    assert.deepEqual(resultado.produtores, []);
+    assert.deepEqual(resultado.rotasIgnoradas, [
+      { unidadeId: "0077", codigo: "2094E", ciclo: "par" },
+    ]);
+    assert.equal(resultado.problemas.length, 1);
+    assert.equal(resultado.problemas[0]!.severidade, "alerta");
+    assert.match(resultado.problemas[0]!.mensagem, /ignorada temporariamente/);
+    assert.deepEqual(auditarBase(resultado.rotas, resultado.produtores), []);
+  }
+});
+
+test("exclusão E zero não exige descarga, mas precisa de data e zero informado", () => {
+  const semDescarga = importarRouteNow(
+    routeNow(eventosCooperativa().slice(0, 2)),
+    "route.csv",
+    "0077",
+    2026,
+  );
+  assert.equal(semDescarga.rotasIgnoradas?.length, 1);
+  assert.deepEqual(semDescarga.problemas, []);
+  for (const km of ["", "inválido", "-1"]) {
+    const resultado = importarRouteNow(
+      routeNow(eventosCooperativa("0077", "28", km)),
+      "route.csv",
+      "0077",
+      2026,
+    );
+    assert.deepEqual(resultado.rotasIgnoradas, []);
+    assert.ok(resultado.problemas.some((p) => p.campo === "km" && p.severidade === "erro"));
+  }
+  const semData = importarRouteNow(
+    routeNow(eventosCooperativa().map((linha) => linha.replace(/28\/09 \d{2}:\d{2}/, ""))),
+    "route.csv",
+    "0077",
+    2026,
+  );
+  assert.equal(semData.rotasIgnoradas?.length, 0);
+  assert.ok(semData.problemas.some((p) => p.campo === "data_hora"));
+});
+
+test("km zero em outros sufixos continua bloqueado e E com percurso continua importada", () => {
+  for (const codigo of ["2094D", "2094R", "2094A", "2094S"]) {
+    const resultado = importarRouteNow(
+      routeNow(eventosCooperativa("0077", "28", "0", codigo)),
+      "route.csv",
+      "0077",
+      2026,
+    );
+    assert.deepEqual(resultado.rotasIgnoradas, []);
+    assert.ok(resultado.problemas.some((p) => p.campo === "km" && p.severidade === "erro"));
+  }
+  const rota = rotaImportada(routeNow(eventosCooperativa("0077", "28", "10")));
+  assert.equal(rota.codigo, "2094E");
+  assert.equal(rota.km, 10);
+  assert.equal(rota.volumeL, 50);
+});
+
+test("exclusão respeita unidade e ciclo, inclusive com códigos iguais num único RouteNow", () => {
+  const resultado = importarArquivosAxiodis(
+    [
+      {
+        nome: "route.csv",
+        texto: routeNow([
+          ...eventosCooperativa("0077", "28"),
+          ...eventosCooperativa("0081", "28", "10"),
+          ...eventosCooperativa("0077", "29", "20"),
+        ]),
+      },
+      {
+        nome: "produtores.csv",
+        texto: [
+          CABECALHO_PRODUTORES,
+          "123456789;COOPERATIVA;2094E;50;0077COO09TO01;28/09 08:00",
+          "123456789;COOPERATIVA;2094E;50;0081COO09TO01;28/09 08:00",
+          "123456789;COOPERATIVA;2094E;50;0077COO09TO01;29/09 08:00",
+        ].join("\n"),
+      },
+    ],
+    "0077",
+    2026,
+  );
+  assert.equal(resultado.rotas.length, 2);
+  assert.equal(resultado.produtores.length, 2);
+  assert.deepEqual(resultado.rotas.map(chaveRota).sort(), ["0077|2094E|impar", "0081|2094E|par"]);
+  assert.deepEqual(
+    resultado.produtores.map((p) => `${p.unidadeId}|${p.rotaCodigo}|${p.ciclo}`).sort(),
+    ["0077|2094E|impar", "0081|2094E|par"],
+  );
+  assert.equal(
+    resultado.rotas.reduce((s, r) => s + r.volumeL, 0),
+    100,
+  );
+  assert.equal(
+    resultado.produtores.reduce((s, p) => s + p.volumeL, 0),
+    100,
+  );
+  assert.deepEqual(auditarBase(resultado.rotas, resultado.produtores), []);
+});
+
+test("arquivos conflitantes não descartam vínculos da rota com percurso", () => {
+  const resultado = importarArquivosAxiodis(
+    [
+      { nome: "route_zero.csv", texto: routeNow(eventosCooperativa()) },
+      { nome: "route_km.csv", texto: routeNow(eventosCooperativa("0077", "28", "10")) },
+      {
+        nome: "produtores.csv",
+        texto: `${CABECALHO_PRODUTORES}\n123456789;COOPERATIVA;2094E;50;0077COO09TO01;28/09 08:00`,
+      },
+    ],
+    "0077",
+    2026,
+  );
+  assert.equal(resultado.rotas.length, 1);
+  assert.equal(resultado.produtores.length, 1);
+  assert.deepEqual(resultado.rotasIgnoradas, []);
+  assert.ok(resultado.problemas.some((p) => p.campo === "km" && p.severidade === "erro"));
 });
