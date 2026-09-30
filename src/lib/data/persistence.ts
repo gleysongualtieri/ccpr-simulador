@@ -19,6 +19,15 @@ const origem = z.object({
 });
 const unidade = z.object({ id: texto(20), nome: texto(200) });
 const trecho = z.object({ motorista: texto(200), inicio: texto(10), fim: texto(10) });
+const pontoOperacional = z.object({
+  codigo: texto(50),
+  nome: texto(300),
+  atividade: texto(100),
+  hora: texto(10),
+  dataHora: texto(64).optional(),
+  volumeInformadoL: z.number().finite().min(-1_000_000_000).max(1_000_000_000).optional(),
+  origemArquivo: texto(255),
+});
 const rota = z.object({
   codigo: texto(50),
   sufixoTipo: z.enum(["D", "R", "A", "B", "C", "E", "S"]),
@@ -36,6 +45,7 @@ const rota = z.object({
   dataExecucao: texto(64).optional(),
   trechos: z.array(trecho).max(100).optional(),
   origem,
+  pontosOperacionais: z.array(pontoOperacional).max(20_000).optional(),
   capacidadeRealL: numero.optional(),
   capacidadeNominalL: numero.optional(),
   capacidadeVeiculoInformadaL: numero.optional(),
@@ -43,6 +53,7 @@ const rota = z.object({
 });
 const produtor = z.object({
   codigo: texto(50),
+  origemCadastro: z.literal("lactalis").optional(),
   nome: texto(300),
   cooperativa: texto(50),
   linha: texto(50),

@@ -1,4 +1,10 @@
-import type { OrigemDado, Produtor, ProblemaQualidade, RotaOperacional } from "../domain/types.ts";
+import type {
+  OrigemDado,
+  PontoOperacional,
+  Produtor,
+  ProblemaQualidade,
+  RotaOperacional,
+} from "../domain/types.ts";
 import {
   CAPACIDADE_MAXIMA_REBOQUE_L,
   CAPACIDADES_REBOQUE_INICIAIS_L,
@@ -166,9 +172,17 @@ export interface PreviaImportacao {
   problemas: ProblemaQualidade[];
   linhasLidas: number;
   rotasIgnoradas?: IdentidadeRota[];
+  pontosOperacionais?: VinculoPontoOperacional[];
 }
 
 type IdentidadeRota = Pick<RotaOperacional, "unidadeId" | "codigo" | "ciclo">;
+interface VinculoPontoOperacional extends IdentidadeRota {
+  ponto: PontoOperacional;
+}
+
+function ehPontoOperacional(codigo: string): boolean {
+  return codigo.trim().toUpperCase().startsWith("J");
+}
 
 const ATIVIDADES_CONHECIDAS = [
   "coleta",
@@ -193,11 +207,14 @@ const MAPEAMENTO_ATIVIDADES: Record<string, string> = {
 };
 
 interface EventoBruto {
+  codigoLocal: string;
+  nomeLocal: string;
   atividade: string;
   atividadeBruta: string;
   veiculo: string;
   km: number;
   volume: number;
+  volumeInformado: number;
   data: Date | null;
   hora: string;
   unidade: string;
@@ -297,6 +314,8 @@ export function importarRouteNow(
   const iDataHora = indice(cab, "dt/hr coleta", "dthrcoleta", "data_hora", "datahora", "dt/hr");
   const iUnidade = indice(cab, "unidade", "filial");
   const iRegiao = indice(cab, "regiao", "linha");
+  const iMatricula = indice(cab, "matricula", "codigo", "codigo_produtor");
+  const iDescricao = indice(cab, "descricao", "nome");
 
   const colunasObrigatorias = [
     [iRota, "Rota"],
@@ -334,11 +353,14 @@ export function importarRouteNow(
       MAPEAMENTO_ATIVIDADES[normalizar(atividadeBruta)] ?? normalizar(atividadeBruta);
     const data = parseDataHora(l[iDataHora], anoReferencia);
     const evento: EventoBruto = {
+      codigoLocal: (l[iMatricula] ?? "").trim().toUpperCase(),
+      nomeLocal: (l[iDescricao] ?? "").trim(),
       atividade,
       atividadeBruta,
       veiculo: (l[iVeiculo] ?? "").trim().toUpperCase(),
       km: numero(l[iKm]),
       volume: numeroOuZero(l[iVolume]),
+      volumeInformado: numero(l[iVolume]),
       data,
       hora: horaDe(data),
       unidade: (l[iUnidade] ?? "").trim(),
@@ -406,7 +428,9 @@ export function importarRouteNow(
       const km = Math.max(0, ...execucao.map((e) => (Number.isFinite(e.km) ? e.km : 0)));
       const volumeL =
         Math.round(
-          execucao.filter((e) => e.atividade === "coleta").reduce((s, e) => s + e.volume, 0) * 1000,
+          execucao
+            .filter((e) => e.atividade === "coleta" && !ehPontoOperacional(e.codigoLocal))
+            .reduce((s, e) => s + e.volume, 0) * 1000,
         ) / 1000;
 
       const comData = execucao.filter((e) => e.data);
@@ -560,6 +584,17 @@ export function importarRouteNow(
         atividadeFimJornada,
         dataExecucao: dataExecucao ? dataExecucao.toISOString() : undefined,
         origem,
+        pontosOperacionais: execucao
+          .filter((e) => ehPontoOperacional(e.codigoLocal))
+          .map((e) => ({
+            codigo: e.codigoLocal,
+            nome: e.nomeLocal || e.codigoLocal,
+            atividade: e.atividadeBruta,
+            hora: e.data ? e.hora : "—",
+            dataHora: e.data?.toISOString(),
+            volumeInformadoL: Number.isFinite(e.volumeInformado) ? e.volumeInformado : undefined,
+            origemArquivo: arquivo,
+          })),
         capacidadeRealL,
         capacidadeNominalL,
         capacidadeReboqueL,
@@ -580,6 +615,7 @@ export function importarProdutoresRotas(
   const linhas = parseDelimitado(texto);
   const problemas: ProblemaQualidade[] = [];
   const produtores: Produtor[] = [];
+  const pontosOperacionais: VinculoPontoOperacional[] = [];
   if (linhas.length < 2) {
     problemas.push({
       severidade: "erro",
@@ -597,6 +633,7 @@ export function importarProdutoresRotas(
   const iRota = indice(cab, "rota", "codigo_rota");
   const iDataHora = indice(cab, "dt / hr coleta", "dt/hr coleta", "dthrcoleta", "data_hora");
   const iVeiculo = indice(cab, "veiculo", "vehicle", "codigo_veiculo");
+  const iInicioRota = indice(cab, "hr inicio rota", "inicio rota");
 
   const ausentes = [
     [iCodigo, "Código"],
@@ -621,7 +658,8 @@ export function importarProdutoresRotas(
   for (let i = 1; i < linhas.length; i++) {
     const l = linhas[i]!;
     const dataColeta = parseDataHora(l[iDataHora], anoReferencia);
-    const ciclo = dataColeta ? (dataColeta.getDate() % 2 === 0 ? "par" : "impar") : undefined;
+    const dataInicio = parseDataHora(l[iInicioRota], anoReferencia) ?? dataColeta;
+    const ciclo = dataInicio ? (dataInicio.getDate() % 2 === 0 ? "par" : "impar") : undefined;
     const rotaCodigo = (l[iRota] ?? "").trim().toUpperCase();
     const unidadeId = decodificarVeiculo(l[iVeiculo]).unidade;
     if (
@@ -631,20 +669,22 @@ export function importarProdutoresRotas(
     )
       continue;
 
-    const codigo = (l[iCodigo] ?? "").replace(/\D/g, "");
+    const codigo = (l[iCodigo] ?? "").trim().toUpperCase();
     if (!codigo) continue;
-    if (codigo.length < 9) {
+    const pontoOperacional = ehPontoOperacional(codigo);
+    const lactalis = /^\d{6}$/.test(codigo);
+    if (!pontoOperacional && !lactalis && !/^\d{9,}$/.test(codigo)) {
       problemas.push({
         severidade: "erro",
         entidade: codigo,
         campo: "codigo",
         mensagem:
-          "Código de produtor inválido — esperado Cooperativa(3) + Linha(3) + Matrícula(3).",
+          "Código inválido — esperado padrão CCPR (9 ou mais dígitos), Lactalis (6 dígitos) ou ponto operacional iniciado por J.",
       });
       continue;
     }
     const volumeL = numero(l[iVolume]);
-    if (!Number.isFinite(volumeL) || volumeL <= 0) {
+    if (!pontoOperacional && (!Number.isFinite(volumeL) || volumeL <= 0)) {
       problemas.push({
         severidade: "alerta",
         entidade: codigo,
@@ -671,6 +711,32 @@ export function importarProdutoresRotas(
       });
       continue;
     }
+    if (pontoOperacional) {
+      if (!unidadeId || !ciclo) {
+        problemas.push({
+          severidade: "erro",
+          entidade: codigo,
+          campo: "unidade",
+          mensagem: "Ponto operacional sem unidade identificável no código do veículo.",
+        });
+        continue;
+      }
+      pontosOperacionais.push({
+        unidadeId,
+        codigo: rotaCodigo,
+        ciclo,
+        ponto: {
+          codigo,
+          nome: (l[iNome] ?? "").trim() || codigo,
+          atividade: "Registro no Produtores_Rotas",
+          hora: horaDe(dataColeta),
+          dataHora: dataColeta.toISOString(),
+          volumeInformadoL: Number.isFinite(volumeL) ? volumeL : undefined,
+          origemArquivo: arquivo,
+        },
+      });
+      continue;
+    }
     const chave = `${unidadeId}|${codigo}|${rotaCodigo}|${ciclo ?? "sem-ciclo"}`;
     const existente = agrupados.get(chave);
     if (existente) {
@@ -683,10 +749,11 @@ export function importarProdutoresRotas(
     // somando os volumes sem inflar a contagem de produtores.
     agrupados.set(chave, {
       codigo,
+      origemCadastro: lactalis ? "lactalis" : undefined,
       nome: (l[iNome] ?? "").trim() || codigo,
-      cooperativa: codigo.slice(0, 3),
-      linha: codigo.slice(3, 6),
-      matricula: codigo.slice(6),
+      cooperativa: lactalis ? "" : codigo.slice(0, 3),
+      linha: lactalis ? "" : codigo.slice(3, 6),
+      matricula: lactalis ? "" : codigo.slice(6),
       volumeL: Number.isFinite(volumeL) ? volumeL : 0,
       rotaCodigo,
       unidadeId,
@@ -697,7 +764,7 @@ export function importarProdutoresRotas(
 
   produtores.push(...agrupados.values());
 
-  return { rotas: [], produtores, problemas, linhasLidas: linhas.length - 1 };
+  return { rotas: [], produtores, problemas, pontosOperacionais, linhasLidas: linhas.length - 1 };
 }
 
 /** RouteNow define as exclusões antes da leitura dos vínculos, em qualquer ordem de seleção. */
@@ -754,6 +821,7 @@ export function importarArquivosAxiodis(
         "Rota E com 0 km ignorada temporariamente (entrada de leite de cooperativa). Seus volumes e vínculos de produtores ficam fora da análise.",
     });
   }
+  const rotasPorChave = new Map(rotas.map((rota) => [chaveRota(rota), rota]));
   for (const arquivo of classificados) {
     if (arquivo.tipo !== "produtores_rotas") continue;
     const resultado = importarProdutoresRotas(
@@ -765,6 +833,26 @@ export function importarArquivosAxiodis(
     produtores.push(...resultado.produtores);
     problemas.push(...resultado.problemas);
     linhasLidas += resultado.linhasLidas;
+    for (const vinculo of resultado.pontosOperacionais ?? []) {
+      const rota = rotasPorChave.get(chaveRota(vinculo));
+      if (!rota) {
+        problemas.push({
+          severidade: "erro",
+          entidade: vinculo.ponto.codigo,
+          campo: "rota",
+          mensagem: `Rota ${vinculo.codigo} do ponto operacional não existe no RouteNow para a mesma unidade e ciclo.`,
+        });
+        continue;
+      }
+      const pontos = rota.pontosOperacionais ?? [];
+      const jaPresente = pontos.some(
+        (p) =>
+          p.codigo === vinculo.ponto.codigo &&
+          p.dataHora === vinculo.ponto.dataHora &&
+          p.volumeInformadoL === vinculo.ponto.volumeInformadoL,
+      );
+      if (!jaPresente) rota.pontosOperacionais = [...pontos, vinculo.ponto];
+    }
   }
   for (const [tipo, nome] of [
     ["route_now", "RouteNow"],
@@ -777,6 +865,24 @@ export function importarArquivosAxiodis(
       campo: "arquivo",
       mensagem: `Selecione pelo menos um arquivo ${nome}.`,
     });
+  }
+  for (const rota of rotas) {
+    const vinculados = produtores.filter(
+      (p) =>
+        p.unidadeId === rota.unidadeId && p.rotaCodigo === rota.codigo && p.ciclo === rota.ciclo,
+    );
+    if (
+      (!rota.regiao || rota.regiao === "—") &&
+      vinculados.some((p) => p.origemCadastro === "lactalis") &&
+      !vinculados.some((p) => p.linha.trim())
+    ) {
+      problemas.push({
+        severidade: "alerta",
+        entidade: rota.codigo,
+        campo: "regiao",
+        mensagem: "Região não informada: o código Lactalis não contém a linha do produtor.",
+      });
+    }
   }
   return { rotas, produtores, problemas, rotasIgnoradas, linhasLidas };
 }
@@ -791,7 +897,9 @@ export function aplicarRegiaoDosProdutores(
       (p) =>
         p.rotaCodigo === rota.codigo &&
         (!p.unidadeId || p.unidadeId === rota.unidadeId) &&
-        (!p.ciclo || p.ciclo === rota.ciclo),
+        (!p.ciclo || p.ciclo === rota.ciclo) &&
+        p.origemCadastro !== "lactalis" &&
+        p.linha.trim().length > 0,
     );
     if (doGrupo.length === 0) return rota;
     const contagem = new Map<string, number>();

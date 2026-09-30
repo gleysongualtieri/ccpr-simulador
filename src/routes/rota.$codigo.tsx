@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { PontosOperacionais } from "@/components/importacao/PontosOperacionais";
 import { PageHeader, SectionTitle } from "@/components/ui-ccpr/PageHeader";
 import { Kpi, KpiGrid, Tag } from "@/components/ui-ccpr/Kpi";
 import { useLinhasRota } from "@/lib/data/selectors";
@@ -212,16 +213,14 @@ function DetalheRota() {
       </div>
 
       <section className="mt-10">
-        <SectionTitle hint={`${daRota.length} produtor(es) — região extraída da linha do código`}>
-          Produtores da rota
-        </SectionTitle>
+        <SectionTitle hint={`${daRota.length} produtor(es)`}>Produtores da rota</SectionTitle>
         <div className="overflow-hidden rounded-md border border-border bg-card">
           <table className="w-full">
             <thead>
               <tr className="bg-surface text-sm font-medium text-muted-foreground">
                 <th className="py-3 pl-4 pr-3 text-left">Código</th>
                 <th className="px-3 py-3 text-left">Produtor</th>
-                <th className="px-3 py-3 text-left">Cooperativa</th>
+                <th className="px-3 py-3 text-left">Cooperativa / cliente</th>
                 <th className="px-3 py-3 text-left">Linha (região)</th>
                 <th className="px-3 py-3 text-left">Matrícula</th>
                 <th className="py-3 pl-3 pr-4 text-right">Volume</th>
@@ -235,9 +234,11 @@ function DetalheRota() {
                 >
                   <td className="py-3 pl-4 pr-3 text-sm tabular">{p.codigo}</td>
                   <td className="px-3 py-3 text-sm">{p.nome}</td>
-                  <td className="px-3 py-3 text-sm">{p.cooperativa}</td>
-                  <td className="px-3 py-3 text-sm">{p.linha}</td>
-                  <td className="px-3 py-3 text-sm">{p.matricula}</td>
+                  <td className="px-3 py-3 text-sm">
+                    {p.origemCadastro === "lactalis" ? "Lactalis" : p.cooperativa || "—"}
+                  </td>
+                  <td className="px-3 py-3 text-sm">{p.linha || "Não informada"}</td>
+                  <td className="px-3 py-3 text-sm">{p.matricula || "Não informada"}</td>
                   <td className="py-3 pl-3 pr-4 text-right text-sm tabular">{litros(p.volumeL)}</td>
                 </tr>
               ))}
@@ -252,6 +253,7 @@ function DetalheRota() {
           </table>
         </div>
       </section>
+      <PontosOperacionais rotas={[rota]} />
     </>
   );
 }

@@ -5,6 +5,7 @@ import {
   auditarBase,
   identificarTipoArquivo,
   importarArquivosAxiodis,
+  aplicarRegiaoDosProdutores,
   importarProdutoresRotas,
   importarRouteNow,
 } from "../src/lib/data/import.ts";
@@ -432,4 +433,136 @@ test("arquivos conflitantes não descartam vínculos da rota com percurso", () =
   assert.equal(resultado.produtores.length, 1);
   assert.deepEqual(resultado.rotasIgnoradas, []);
   assert.ok(resultado.problemas.some((p) => p.campo === "km" && p.severidade === "erro"));
+});
+
+test("Lactalis preserva seis dígitos e zeros iniciais, soma tanques e não inventa linha ou matrícula", () => {
+  const resultado = importarProdutoresRotas(
+    [
+      CABECALHO_PRODUTORES,
+      "000123;PRODUTOR LACTALIS;2000D;100;0077VIA09TO01;28/09 08:00",
+      "000123;PRODUTOR LACTALIS;2000D;200;0077VIA09TO01;28/09 08:00",
+      "603165;OUTRO PRODUTOR;2000D;50;0077VIA09TO01;28/09 09:00",
+      "123456789;PRODUTOR CCPR;2000D;100;0077VIA09TO01;28/09 10:00",
+    ].join("\n"),
+    "produtores.csv",
+    2026,
+  );
+  assert.deepEqual(resultado.problemas, []);
+  assert.equal(resultado.produtores.length, 3);
+  const lactalis = resultado.produtores[0]!;
+  assert.equal(lactalis.codigo, "000123");
+  assert.equal(lactalis.volumeL, 300);
+  assert.equal(lactalis.origemCadastro, "lactalis");
+  assert.equal(lactalis.cooperativa, "");
+  assert.equal(lactalis.linha, "");
+  assert.equal(lactalis.matricula, "");
+  const ccpr = resultado.produtores[2]!;
+  assert.equal(ccpr.cooperativa, "123");
+  assert.equal(ccpr.linha, "456");
+  assert.equal(ccpr.matricula, "789");
+  const rota = rotaImportada(routeNow(eventosCooperativa("0077", "28", "10", "2000D")));
+  assert.equal(aplicarRegiaoDosProdutores([rota], resultado.produtores)[0]!.regiao, "456");
+  assert.equal(aplicarRegiaoDosProdutores([rota], [lactalis])[0]!.regiao, "—");
+  assert.equal(
+    aplicarRegiaoDosProdutores([{ ...rota, regiao: "777" }], [lactalis])[0]!.regiao,
+    "777",
+  );
+});
+
+test("outros códigos inválidos não viram produtor por remoção de letras ou preenchimento", () => {
+  for (const codigo of ["ABC123456789", "12345", "1234567", "12345678"]) {
+    const resultado = importarProdutoresRotas(
+      `${CABECALHO_PRODUTORES}\n${codigo};PRODUTOR;2000D;10;0077VIA09TO01;28/09 08:00`,
+      "produtores.csv",
+      2026,
+    );
+    assert.equal(resultado.produtores.length, 0);
+    assert.ok(resultado.problemas.some((p) => p.campo === "codigo" && p.severidade === "erro"));
+  }
+});
+
+test("pontos J preservam eventos e jornada sem inflar produtores, volume ou região", () => {
+  const arquivos = [
+    {
+      nome: "produtores.csv",
+      texto: [
+        CABECALHO_PRODUTORES,
+        "603165;PRODUTOR LACTALIS;2000D;500;0077VIA09TO01;28/09 08:00",
+        "J0604;POSTO;2000D;1;0077VIA09TO01;28/09 09:00",
+      ].join("\n"),
+    },
+    {
+      nome: "route.csv",
+      texto: routeNow([
+        "0077VIA09TO01;;2000D;Saída;J0604;POSTO;;0;28/09 06:00;;",
+        "0077VIA09TO01;1;2000D;Coleta;603165;PRODUTOR LACTALIS;500;50;28/09 08:00;;",
+        "0077VIA09TO01;2;2000D;Coleta;j0604;POSTO;1,000;60;28/09 09:00;;",
+        "0077VIA09TO01;;2000D;Transvaso;J0604;POSTO;500;60;28/09 09:05;;",
+        "0077VIA09TO01;;2000D;Descarregamento;J0515;PONTO;500;80;28/09 12:00;;",
+        "0077VIA09TO01;;2000D;Serviço;J0515;LAVADOR;;90;28/09 13:00;;",
+        "0077VIA09TO01;;2000D;Regresso;J0604;POSTO;;100;28/09 14:00;;",
+      ]),
+    },
+  ];
+  for (const ordem of [arquivos, [...arquivos].reverse()]) {
+    const resultado = importarArquivosAxiodis(ordem, "0077", 2026);
+    assert.equal(resultado.produtores.length, 1);
+    assert.equal(resultado.produtores[0]!.codigo, "603165");
+    const rota = resultado.rotas[0]!;
+    assert.equal(rota.volumeL, 500);
+    assert.equal(rota.km, 100);
+    assert.equal(rota.inicioRota, "06:00");
+    assert.equal(rota.chegadaBase, "13:00");
+    assert.equal(rota.atividadeFimJornada, "servico");
+    assert.equal(rota.pontosOperacionais?.length, 6);
+    assert.equal(rota.pontosOperacionais?.[0]?.volumeInformadoL, undefined);
+    assert.equal(rota.pontosOperacionais?.[1]?.codigo, "J0604");
+    assert.equal(rota.pontosOperacionais?.[1]?.volumeInformadoL, 1);
+    assert.equal(rota.pontosOperacionais?.[2]?.volumeInformadoL, 500);
+    assert.deepEqual(auditarBase([rota], resultado.produtores), []);
+    assert.equal(resultado.problemas.filter((p) => p.severidade === "erro").length, 0);
+    assert.ok(resultado.problemas.some((p) => p.campo === "regiao"));
+  }
+});
+
+test("J no cadastro sem evento correspondente é mantido na rota; vínculo órfão é indicado", () => {
+  const resultado = importarArquivosAxiodis(
+    [
+      { nome: "route.csv", texto: routeNow(eventosCooperativa("0077", "28", "10")) },
+      {
+        nome: "produtores.csv",
+        texto: [
+          CABECALHO_PRODUTORES,
+          "123456789;PRODUTOR;2094E;50;0077COO09TO01;28/09 08:00",
+          "JXXXX;PONTO;2094E;;0077COO09TO01;28/09 08:00",
+          "J0804;OUTRO PONTO;2094E;1;0081COO09TO01;28/09 08:00",
+          "J0804;OUTRO CICLO;2094E;1;0077COO09TO01;29/09 08:00",
+        ].join("\n"),
+      },
+    ],
+    "0077",
+    2026,
+  );
+  assert.equal(resultado.produtores.length, 1);
+  assert.equal(resultado.rotas[0]!.pontosOperacionais?.length, 1);
+  assert.equal(resultado.rotas[0]!.pontosOperacionais?.[0]?.codigo, "JXXXX");
+  assert.equal(
+    resultado.problemas.filter((p) => p.campo === "rota" && p.severidade === "erro").length,
+    2,
+  );
+  assert.ok(!resultado.problemas.some((p) => p.campo === "codigo" || p.campo === "volume"));
+});
+
+test("coleta após meia-noite usa ciclo da saída quando informado no cadastro", () => {
+  const resultado = importarProdutoresRotas(
+    [
+      `${CABECALHO_PRODUTORES};Hr Início Rota`,
+      "603165;PRODUTOR;2000D;100;0077VIA09TO01;29/09 00:30;28/09 20:00",
+      "J0604;PONTO;2000D;1;0077VIA09TO01;29/09 01:00;28/09 20:00",
+    ].join("\n"),
+    "produtores.csv",
+    2026,
+  );
+  assert.equal(resultado.produtores[0]!.ciclo, "par");
+  assert.equal(resultado.pontosOperacionais?.[0]?.ciclo, "par");
 });

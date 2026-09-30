@@ -58,11 +58,12 @@ export interface TarifaTransporte {
 }
 
 export interface Produtor {
-  /** Código completo: Cooperativa + Linha + Matrícula (ex.: 205501587) */
+  /** Código original: padrão CCPR ou seis dígitos do cadastro Lactalis. */
   codigo: string;
+  origemCadastro?: "lactalis" | undefined;
   nome: string;
   cooperativa: string;
-  /** Segmento "Linha" do código — usado como região (PRD 6.6) */
+  /** Linha do padrão CCPR; vazia quando não informada pelo cadastro Lactalis. */
   linha: string;
   matricula: string;
   volumeL: number;
@@ -73,6 +74,18 @@ export interface Produtor {
   ciclo?: "par" | "impar" | undefined;
   /** ISO — data/hora da coleta, quando disponível no arquivo de origem. */
   dataColeta?: string | undefined;
+}
+
+/** Evento em um local operacional J; não é produtor nem nova coleta de leite. */
+export interface PontoOperacional {
+  codigo: string;
+  nome: string;
+  atividade: string;
+  hora: string;
+  dataHora?: string | undefined;
+  /** Valor original para conferência; não compõe o volume coletado dos produtores. */
+  volumeInformadoL?: number | undefined;
+  origemArquivo: string;
 }
 
 export interface TrechoJornada {
@@ -108,6 +121,7 @@ export interface RotaOperacional {
   trechos?: TrechoJornada[];
   /** Rastreabilidade */
   origem: OrigemDado;
+  pontosOperacionais?: PontoOperacional[] | undefined;
   /** Capacidade real do veículo (cavalo + reboque, quando houver) */
   capacidadeRealL?: number | undefined;
   /** Capacidade nominal do cavalo (sem reboque) */

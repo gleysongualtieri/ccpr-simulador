@@ -91,6 +91,41 @@ test("projeto transporta integralmente capacidades, tarifas precisas, vínculos 
   assert.match(nomeArquivoProjeto(aberto), /^0081_Estudo_Uberlandia_.*\.ccpr$/);
 });
 
+test("Lactalis e pontos operacionais sobrevivem ao F5 e ao arquivo de projeto", () => {
+  const comPontos: DadosProjeto = {
+    ...dados,
+    produtores: [
+      {
+        ...dados.produtores[0]!,
+        codigo: "000123",
+        origemCadastro: "lactalis",
+        cooperativa: "",
+        linha: "",
+        matricula: "",
+      },
+    ],
+    rotas: [
+      {
+        ...dados.rotas[0]!,
+        pontosOperacionais: [
+          {
+            codigo: "J0604",
+            nome: "POSTO",
+            atividade: "Transvaso",
+            hora: "08:00",
+            dataHora: "2026-09-28T11:00:00.000Z",
+            volumeInformadoL: 500,
+            origemArquivo: "Route_now.csv",
+          },
+        ],
+      },
+    ],
+  };
+  const aberto = lerProjeto(serializarProjeto(criarProjeto(comPontos, "Teste J", "Analista")));
+  assert.deepEqual(aberto.dados, comPontos);
+  assert.deepEqual(lerEstadoPersistido(JSON.stringify(comPontos)), comPontos);
+});
+
 test("recusa versões incompatíveis, arquivo parcial, dados inválidos e JSON corrompido", () => {
   const projeto = criarProjeto(dados, "Estudo", "Analista");
   for (const valor of [

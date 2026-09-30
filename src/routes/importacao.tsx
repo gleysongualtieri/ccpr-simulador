@@ -1,4 +1,5 @@
 import { ProjectFiles } from "@/components/projects/ProjectFiles";
+import { PontosOperacionais } from "@/components/importacao/PontosOperacionais";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, SectionTitle } from "@/components/ui-ccpr/PageHeader";
@@ -113,6 +114,9 @@ function Importacao() {
   const produtoresUnicos = previa
     ? new Set(previa.produtores.map((produtor) => produtor.codigo)).size
     : 0;
+  const lactalisUnicos = new Set(
+    previa?.produtores.filter((p) => p.origemCadastro === "lactalis").map((p) => p.codigo),
+  ).size;
 
   function informarCapacidadeReboque(indiceRota: number, capacidadeReboqueL: number | undefined) {
     setPrevia((atual) => {
@@ -222,7 +226,15 @@ function Importacao() {
                 tom={alertas.length ? "atencao" : "neutro"}
               />
             </KpiGrid>
+            {lactalisUnicos > 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                {lactalisUnicos} produtor(es) Lactalis reconhecido(s), com os códigos originais de
+                seis dígitos.
+              </p>
+            ) : null}
           </div>
+
+          <PontosOperacionais rotas={previa.rotas} />
 
           <div className="mt-6 flex flex-wrap gap-3">
             <button
