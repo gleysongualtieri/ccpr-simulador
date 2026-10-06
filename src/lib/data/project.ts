@@ -158,12 +158,12 @@ export function incorporarProjeto(
       );
     return { ...s, unidadeId: id };
   });
-  // Cadastros globais só podem mudar se não afetarem outra base carregada.
+  // Protege outras bases reais; o cadastro inicial da demonstração pode ser atualizado.
   const transportadoras = new Map(atual.transportadoras.map((t) => [t.sigla, t]));
   const outrasRotas = atual.rotas.filter((r) => r.unidadeId !== unidadeId);
   for (const t of recebido.transportadoras) {
     const anterior = transportadoras.get(t.sigla);
-    if (outrasRotas.some((r) => r.transportadora === t.sigla)) {
+    if (outrasRotas.some((r) => !r.origem.mock && r.transportadora === t.sigla)) {
       if (
         !anterior ||
         anterior.ativa !== t.ativa ||

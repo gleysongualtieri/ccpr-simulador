@@ -9,6 +9,8 @@ import {
   type DadosProjeto,
 } from "../src/lib/data/project.ts";
 import { lerEstadoPersistido, gravarEstadoPersistido } from "../src/lib/data/persistence.ts";
+import { PRODUTORES_MOCK, ROTAS_MOCK, UNIDADES } from "../src/lib/data/seed.ts";
+import { resolverTarifaRota, TRANSPORTADORAS_INICIAIS } from "../src/lib/data/tariffs.ts";
 
 const dados: DadosProjeto = {
   unidades: [{ id: "0081", nome: "Uberlândia" }],
@@ -222,6 +224,72 @@ test("cadastro conflitante de transportadora compartilhada bloqueia abertura sem
     "Gleyson",
   );
   assert.throws(() => incorporarProjeto(atual, novo, "0081"), /conflita/);
+  assert.equal(JSON.stringify(atual), antes);
+});
+
+test("primeiro projeto real abre em outra unidade mesmo com VIA vazia na demonstração", () => {
+  const inicial: DadosProjeto = {
+    unidades: UNIDADES,
+    unidadeAtivaId: "0081",
+    rotas: ROTAS_MOCK,
+    produtores: PRODUTORES_MOCK,
+    simulacoes: [],
+    tarifas: [],
+    transportadoras: TRANSPORTADORAS_INICIAIS,
+  };
+  const antes = JSON.stringify(inicial);
+  const novo = criarProjetoUnidade(
+    {
+      ...dados,
+      unidades: [{ id: "0077", nome: "Pará de Minas" }],
+      unidadeAtivaId: "0077",
+      rotas: dados.rotas.map((r) => ({ ...r, unidadeId: "0077" })),
+      produtores: dados.produtores.map((p) => ({ ...p, unidadeId: "0077" })),
+      simulacoes: dados.simulacoes.map((s) => ({ ...s, unidadeId: "0077" })),
+      tarifas: dados.tarifas.map((t) => ({
+        ...t,
+        unidadeId: "0077",
+        categoriaReboque: "comum",
+      })),
+    },
+    "Pará de Minas",
+    "Gleyson",
+  );
+  const resultado = incorporarProjeto(inicial, novo, "0077");
+  const unidade = dadosDaUnidade(resultado, "0077");
+  assert.equal(resultado.unidadeAtivaId, "0077");
+  for (const campo of ["rotas", "produtores", "simulacoes", "tarifas"] as const) {
+    assert.deepEqual(unidade[campo], novo.dados[campo]);
+  }
+  const rota = unidade.rotas[0]!;
+  assert.equal(
+    resolverTarifaRota(rota, rota.equipamentoId, resultado.tarifas, resultado.transportadoras)
+      ?.tarifa?.id,
+    novo.dados.tarifas[0]!.id,
+  );
+  assert.deepEqual(
+    resultado.rotas.filter((r) => r.origem.mock),
+    ROTAS_MOCK,
+  );
+  assert.deepEqual(lerEstadoPersistido(JSON.stringify(resultado)), resultado);
+  assert.equal(JSON.stringify(inicial), antes);
+});
+
+test("demonstração junto de outra base real não desativa a proteção de transportadoras", () => {
+  const atual = duasUnidades();
+  atual.rotas.push({
+    ...dados.rotas[0]!,
+    codigo: "9999R",
+    unidadeId: "0002",
+    origem: { ...dados.rotas[0]!.origem, mock: true },
+  });
+  const antes = JSON.stringify(atual);
+  const novo = criarProjetoUnidade(
+    { ...dados, transportadoras: [{ ...dados.transportadoras[0]!, cnpjs: [] }] },
+    "Novo",
+    "Gleyson",
+  );
+  assert.throws(() => incorporarProjeto(atual, novo, "0081"), /VIA conflita/);
   assert.equal(JSON.stringify(atual), antes);
 });
 
