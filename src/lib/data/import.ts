@@ -1013,11 +1013,12 @@ export function auditarBase(rotas: RotaOperacional[], produtores: Produtor[]): P
       });
     }
     if (capacidadeRealL && rota.volumeL > capacidadeRealL) {
+      // A base real pode conter excesso para análise; a simulação mantém seu próprio bloqueio.
       problemas.push({
-        severidade: "erro",
+        severidade: "alerta",
         entidade: rota.codigo,
         campo: "capacidade",
-        mensagem: `Volume acima da capacidade total em ${Math.round(rota.volumeL - capacidadeRealL)} L.`,
+        mensagem: `Volume acima da capacidade total em ${Math.round(rota.volumeL - capacidadeRealL)} L. A importação é permitida para análise; a rota será classificada como crítica. Simulações com excesso de capacidade continuam bloqueadas.`,
       });
     }
     if (

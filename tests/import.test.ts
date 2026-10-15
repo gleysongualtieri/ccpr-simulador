@@ -11,8 +11,9 @@ import {
 } from "../src/lib/data/import.ts";
 import { calcularJornada, rotuloFimJornada } from "../src/lib/calculations/routeJourney.ts";
 import { lerEstadoPersistido } from "../src/lib/data/persistence.ts";
+import { simularRota } from "../src/lib/calculations/simulation.ts";
 import { decodificarVeiculo, equipamentoPorSigla } from "../src/lib/calculations/equipment.ts";
-import type { Produtor, RotaOperacional } from "../src/lib/domain/types.ts";
+import type { Produtor, RotaOperacional, TarifaTransporte } from "../src/lib/domain/types.ts";
 import {
   chaveRota,
   encontrarRotaPorIdentificador,
@@ -121,7 +122,7 @@ test("Produtores_Rotas agrupa tanques do mesmo produtor, rota e ciclo", () => {
   assert.equal(resultado.produtores[0]!.ciclo, "impar");
 });
 
-test("rota R com veículo-base bloqueia até informar reboque e bloqueia excesso", () => {
+test("rota R exige capacidade do reboque e permite importar excesso com alerta", () => {
   const rota = rotaImportada(
     routeNow([
       "0081VIA18BT06;;2800R;Saída;0081;BASE;;0;10/09 05:45;-18,8;-48,3",
@@ -141,13 +142,108 @@ test("rota R com veículo-base bloqueia até informar reboque e bloqueia excesso
     ciclo: "par",
   };
 
-  assert.ok(auditarBase([rota], [produtor]).some((p) => p.campo === "reboque"));
+  assert.ok(
+    auditarBase([rota], [produtor]).some((p) => p.campo === "reboque" && p.severidade === "erro"),
+  );
 
   const com15 = { ...rota, capacidadeReboqueL: 15000, capacidadeRealL: 33000 };
-  assert.ok(auditarBase([com15], [produtor]).some((p) => p.campo === "capacidade"));
+  const problemas = auditarBase([com15], [produtor]);
+  assert.ok(problemas.some((p) => p.campo === "capacidade" && p.severidade === "alerta"));
+  assert.ok(!problemas.some((p) => p.severidade === "erro"));
 
   const com18 = { ...rota, capacidadeReboqueL: 18000, capacidadeRealL: 36000 };
   assert.ok(!auditarBase([com18], [produtor]).some((p) => p.campo === "capacidade"));
+});
+
+test("3314D importa 9.240 L em 9.000 L, preserva o excesso e exige equipamento suficiente na simulação", () => {
+  // Dados sintéticos reproduzem os valores confirmados no teste de Campina Verde.
+  const previa = importarArquivosAxiodis(
+    [
+      {
+        nome: "Route_now_0112.csv",
+        texto: routeNow([
+          "0112VIA09TO01;;3314D;Saída;0112;BASE;;0;15/10 05:00;-19,5;-49,4",
+          "0112VIA09TO01;1;3314D;Coleta;123405789;PRODUTOR;9.240;100;15/10 08:00;-19,6;-49,5",
+          "0112VIA09TO01;;3314D;Balanza;0112;BASE;;200;15/10 15:00;-19,5;-49,4",
+        ]),
+      },
+      {
+        nome: "Produtores_Rotas_0112.csv",
+        texto: [
+          "Código;Nome;Rota;Volume/coleta;Veículo;Dt / Hr Coleta",
+          "123405789;PRODUTOR;3314D;9.240;0112VIA09TO01;15/10 08:00",
+        ].join("\r\n"),
+      },
+    ],
+    "0077",
+    2026,
+  );
+  assert.deepEqual(previa.problemas, []);
+  assert.equal(previa.rotas.length, 1);
+  const rota = previa.rotas[0]!;
+  const original = structuredClone(rota);
+  assert.equal(rota.unidadeId, "0112");
+  assert.equal(rota.volumeL, 9240);
+  assert.equal(rota.capacidadeRealL, 9000);
+  const problemas = auditarBase(previa.rotas, previa.produtores);
+  assert.equal(problemas.length, 1);
+  assert.equal(problemas[0]!.severidade, "alerta");
+  assert.match(problemas[0]!.mensagem, /240 L.*crítica/);
+  const restaurado = lerEstadoPersistido(
+    JSON.stringify({ rotas: previa.rotas, produtores: previa.produtores }),
+  )!;
+  assert.deepEqual(restaurado.rotas![0], JSON.parse(JSON.stringify(original)));
+
+  // Tarifas fictícias isolam a validação de capacidade de outras pendências.
+  const tarifas: TarifaTransporte[] = ["toco", "truck"].map((equipamentoId) => ({
+    id: equipamentoId,
+    unidadeId: "0112",
+    localNome: "Campina Verde",
+    cnpj: "07031916000239",
+    transportadoraNome: "Via",
+    codigoTarifa: "teste",
+    tipoOrigem: equipamentoId,
+    equipamentoId,
+    inicioVigencia: "2026-01-01",
+    diaria: 1000,
+    custoKm: 3,
+    atualizadaEm: "2026-01-01",
+    origemArquivo: "tarifas_teste.xlsx",
+  }));
+  const transportadoras = [{ sigla: "VIA", nome: "Via", cnpjs: ["07031916000239"], ativa: true }];
+  const entrada = { aumentoVolumeL: 0, aumentoKm: 1, equipamentoIdSimulado: "toco" };
+  const insuficiente = simularRota(rota, entrada, tarifas, transportadoras)!;
+  assert.equal(insuficiente.viavel, false);
+  assert.equal(insuficiente.capacidade.excedenteL, 240);
+  assert.deepEqual(insuficiente.motivosBloqueio, ["Capacidade excedida em 240 L."]);
+  assert.ok(insuficiente.atual.ocupacao > 1);
+
+  const maior = { ...entrada, equipamentoIdSimulado: "truck", capacidadeVeiculoSimuladaL: 15000 };
+  const suficiente = simularRota(rota, maior, tarifas, transportadoras)!;
+  assert.equal(suficiente.viavel, true);
+  assert.equal(suficiente.simulado.volumeL, 9240);
+  assert.equal(suficiente.simulado.capacidadeL, 15000);
+  assert.equal(
+    simularRota(rota, { ...maior, aumentoVolumeL: 5760 }, tarifas, transportadoras)!.viavel,
+    true,
+  );
+  assert.equal(
+    simularRota(rota, { ...maior, aumentoVolumeL: 5761 }, tarifas, transportadoras)!.viavel,
+    false,
+  );
+  assert.deepEqual(rota, original);
+
+  // A liberação do excesso não libera inconsistências dos arquivos nem capacidades inválidas.
+  assert.ok(
+    auditarBase([rota], [{ ...previa.produtores[0]!, volumeL: 8000 }]).some(
+      (p) => p.campo === "volume" && p.severidade === "erro",
+    ),
+  );
+  assert.ok(
+    auditarBase([{ ...rota, capacidadeVeiculoInformadaL: 0 }], previa.produtores).some(
+      (p) => p.campo === "capacidade" && p.severidade === "erro",
+    ),
+  );
 });
 
 test("jornada é medida entre Saída e Balanza com limite de 13 horas", () => {
