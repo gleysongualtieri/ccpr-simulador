@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader } from "@/components/ui-ccpr/PageHeader";
 import { Tag } from "@/components/ui-ccpr/Kpi";
 import { useLinhasRota } from "@/lib/data/selectors";
-import { densidadeFmt, km as fmtKm, litros, reais, reaisLitro } from "@/lib/format";
+import { densidadeFmt, km as fmtKm, litros, percentual, reais, reaisLitro } from "@/lib/format";
 import { formatarHoras } from "@/lib/calculations/routeJourney";
 import { MoreHorizontal } from "lucide-react";
 import { chaveRota, identificadorRotaUrl } from "@/lib/data/identity";
@@ -111,7 +111,7 @@ function Ranking() {
       </div>
 
       <div className="overflow-x-auto rounded-md border border-border bg-card">
-        <table className="w-full min-w-[1100px]">
+        <table className="w-full min-w-[1250px]">
           <thead>
             <tr className="bg-surface text-sm font-medium text-muted-foreground">
               <th className="py-3 pl-4 pr-3 text-left">#</th>
@@ -125,6 +125,7 @@ function Ranking() {
               <th className="px-3 py-3 text-right">R$/L</th>
               <th className="px-3 py-3 text-right">Densidade</th>
               <th className="px-3 py-3 text-right">Jornada</th>
+              <th className="whitespace-nowrap px-3 py-3 text-right">Taxa de Ocupação</th>
               <th className="px-3 py-3 text-left">Status</th>
               <th className="py-3 pl-3 pr-4 text-right">Ações</th>
             </tr>
@@ -161,6 +162,11 @@ function Ranking() {
                 <td className="px-3 py-3 text-right text-sm tabular">
                   {formatarHoras(l.jornada.horas)}
                 </td>
+                <td
+                  className={`px-3 py-3 text-right text-sm tabular ${l.ind.ocupacao > 1 ? "text-destructive" : ""}`}
+                >
+                  {percentual(l.ind.ocupacao)}
+                </td>
                 <td className="px-3 py-3 text-sm">
                   <Tag
                     tom={
@@ -188,7 +194,7 @@ function Ranking() {
             ))}
             {filtradas.length === 0 ? (
               <tr>
-                <td colSpan={13} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                <td colSpan={14} className="px-4 py-10 text-center text-sm text-muted-foreground">
                   Nenhuma rota encontrada com os filtros aplicados.
                 </td>
               </tr>
